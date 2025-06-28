@@ -78,20 +78,19 @@ const Demo = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#4f8cff] to-[#3887f6]">
+    <div className="min-h-screen bg-white">
       <Navbar />
-      
-      <div className="pt-20">
-        {/* Header */}
-        <div className="bg-white border-b border-gray-200">
+      <div>
+        {/* Header azul degradado */}
+        <div className="bg-gradient-to-br from-[#4f8cff] to-[#3887f6] text-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
             <div className="inline-flex items-center px-4 py-2 bg-yellow-100 border border-yellow-300 rounded-full text-sm font-medium mb-6 text-yellow-800">
               ⚠️ Modo Demo - Datos simulados para demostración
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+            <h1 className="text-4xl md:text-5xl font-bold mb-6">
               Demo de Escáner de Seguridad
             </h1>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            <p className="text-xl text-blue-100 max-w-3xl mx-auto">
               Experimenta las capacidades de nuestra herramienta de ciberseguridad con datos de demostración
             </p>
           </div>
