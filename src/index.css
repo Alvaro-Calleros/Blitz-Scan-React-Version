@@ -1,0 +1,134 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Blitz Scan Design System - Light Theme */
+@layer base {
+  :root {
+    /* Core Colors - Light Theme */
+    --white: #ffffff;
+    --black: #000000;
+    --light-gray: #f8fafc;
+    --medium-gray: #e2e8f0;
+    --dark-gray: #64748b;
+    
+    /* Primary Palette - Royal Blue */
+    --primary: #2563eb;
+    --primary-light: #60a5fa;
+    --primary-dark: #1d4ed8;
+    --secondary: #3b82f6;
+    --accent: #1e40af;
+    
+    /* Status Colors */
+    --success: #059669;
+    --warning: #d97706;
+    --error: #dc2626;
+    --info: #0284c7;
+    
+    /* Background & Text - Light Theme */
+    --bg-primary: var(--white);
+    --bg-secondary: var(--light-gray);
+    --bg-card: var(--white);
+    --text-primary: var(--black);
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+    
+    /* Borders & Effects */
+    --border-radius: 12px;
+    --border-color: #e2e8f0;
+    --shadow-primary: 0 10px 30px rgba(37, 99, 235, 0.15);
+    --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.08);
+    
+    /* Gradients - Royal Blue */
+    --gradient-primary: linear-gradient(135deg, #3b82f6, #2563eb);
+    --gradient-hero: linear-gradient(135deg, #60a5fa, #3b82f6);
+
+    /* Shadcn Variables - Light Theme */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.75rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+  }
+
+  /* Custom Scrollbar - Light Theme */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--light-gray);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--primary);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-dark);
+  }
+}
+
+/* Custom Components - Light Theme */
+@layer components {
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/25;
+  }
+
+  .btn-secondary {
+    @apply border-2 border-blue-600 text-blue-600 bg-white font-medium py-3 px-6 rounded-xl transition-all duration-300 hover:bg-blue-600 hover:text-white;
+  }
+
+  .card-light {
+    @apply bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300;
+  }
+
+  .text-gradient {
+    @apply bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent;
+  }
+
+  .hero-gradient {
+    @apply bg-gradient-to-br from-blue-500 to-blue-600;
+  }
+}
+
+@keyframes bounce-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-18px); }
+}
+.animate-bounce-slow {
+  animation: bounce-slow 2.8s ease-in-out infinite;
+}
