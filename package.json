@@ -1,7 +1,7 @@
 {
   "name": "vite_react_shadcn_ts",
   "version": "2.1.0",
-  "homepage": "https://Alvaro-Calleros.github.io/BlitzScan.io",
+  "homepage": "https://Alvaro-Calleros.github.io/BlitzScan-Site",
   "type": "module",
   "scripts": {
     "dev": "vite",
