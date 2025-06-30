@@ -22,8 +22,6 @@ const Scanner = () => {
     { id: 'fuzzing', name: 'Fuzzing', description: 'Búsqueda de directorios y archivos ocultos' },
     { id: 'nmap', name: 'Nmap Scan', description: 'Escaneo de puertos y servicios' },
     { id: 'whois', name: 'WHOIS Lookup', description: 'Información del dominio y registrante' },
-    { id: 'sqli', name: 'SQL Injection', description: 'Detección de vulnerabilidades SQLi' },
-    { id: 'xss', name: 'XSS Detection', description: 'Búsqueda de vulnerabilidades XSS' }
   ];
 
   const handleScan = async () => {
