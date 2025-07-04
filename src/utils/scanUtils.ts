@@ -106,7 +106,7 @@ Recomendaciones:
 Generado por BLITZ SCAN - Herramienta de Ciberseguridad
   `.trim();
 
-  // Create and download the report
+  // Create and download the report or report in pdf
   const blob = new Blob([reportContent], { type: 'text/plain' });
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
