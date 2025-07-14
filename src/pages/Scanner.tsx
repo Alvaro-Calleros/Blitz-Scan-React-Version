@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
-import { simulateScan, saveScanToStorage, generatePDFReport, generateScanId, Scan, ScanResult } from '../utils/scanUtils';
+import WhoisResult from '../components/WhoisResult';
+import NmapResult from '../components/NmapResult';
+import FuzzingResult from '../components/FuzzingResult';
+import { simulateScan, saveScanToStorage, generatePDFReport, generateScanId, Scan, ScanResult, scanFuzzing, scanNmap, scanWhois } from '../utils/scanUtils';
 
 const Scanner = () => {
   const [url, setUrl] = useState('');
@@ -54,11 +57,26 @@ const Scanner = () => {
     toast.info('Iniciando escaneo...');
 
     try {
-      const results = await simulateScan(url, scanType);
+      let results: ScanResult[] = [];
+      let extraResult: any = null;
+      
+      // Usar las funciones reales según el tipo de escaneo
+      if (scanType === 'fuzzing') {
+        results = await scanFuzzing(url);
+      } else if (scanType === 'nmap') {
+        extraResult = await scanNmap(url);
+      } else if (scanType === 'whois') {
+        // WHOIS ahora se maneja directamente en el componente
+        extraResult = null;
+      } else {
+        // Fallback a simulación
+        results = await simulateScan(url, scanType);
+      }
       
       const completedScan: Scan = {
         ...newScan,
         results,
+        extraResult,
         status: 'completed'
       };
 
@@ -67,6 +85,7 @@ const Scanner = () => {
       toast.success('¡Escaneo completado con éxito!');
       
     } catch (error) {
+      console.error('Scan error:', error);
       const failedScan: Scan = {
         ...newScan,
         status: 'failed'
@@ -218,37 +237,35 @@ const Scanner = () => {
                 </div>
               )}
 
-              {currentScan && currentScan.status === 'completed' && currentScan.results.length > 0 && (
+              {currentScan && currentScan.status === 'completed' && (
                 <div className="space-y-6">
-                  {/* Results Table */}
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-200 bg-gray-50">
-                          <th className="text-left py-4 px-4 text-gray-700 font-semibold">Ruta Encontrada</th>
-                          <th className="text-left py-4 px-4 text-gray-700 font-semibold">Status</th>
-                          <th className="text-left py-4 px-4 text-gray-700 font-semibold">Tamaño</th>
-                          <th className="text-left py-4 px-4 text-gray-700 font-semibold">Tiempo</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {currentScan.results.map((result) => (
-                          <tr key={result.id_fuzz_result} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                            <td className="py-4 px-4 text-gray-900 font-mono text-sm">{result.path_found}</td>
-                            <td className={`py-4 px-4 font-semibold ${
-                              result.http_status >= 200 && result.http_status < 300 ? 'text-green-600' :
-                              result.http_status >= 300 && result.http_status < 400 ? 'text-yellow-600' :
-                              'text-red-600'
-                            }`}>
-                              {result.http_status}
-                            </td>
-                            <td className="py-4 px-4 text-gray-600">{result.response_size}B</td>
-                            <td className="py-4 px-4 text-gray-600">{result.response_time.toFixed(3)}s</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  {/* Mostrar resultados según el tipo de escaneo */}
+                  {scanType === 'fuzzing' && currentScan.results.length > 0 && (
+                    <FuzzingResult results={currentScan.results} />
+                  )}
+                  
+                  {/* Mostrar resultados de WHOIS */}
+                  {scanType === 'whois' && (
+                    <WhoisResult url={currentScan.url} />
+                  )}
+                  
+                  {/* Mostrar resultados de Nmap */}
+                  {scanType === 'nmap' && currentScan.extraResult && (
+                    <NmapResult result={currentScan.extraResult} />
+                  )}
+                  
+                  {/* Mostrar mensaje si no hay resultados */}
+                  {currentScan.results.length === 0 && !currentScan.extraResult && (
+                    <div className="text-center py-12">
+                      <div className="w-16 h-16 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center">
+                        <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.47-.881-6.08-2.33" />
+                        </svg>
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No se encontraron resultados</h3>
+                      <p className="text-gray-500">El escaneo no detectó información relevante para este objetivo.</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
