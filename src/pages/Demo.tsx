@@ -61,7 +61,7 @@ const Demo = () => {
     setIsScanning(true);
     setScanComplete(false);
     
-    // Simulate scan process
+    // Simulate scan process demo
     setTimeout(() => {
       setIsScanning(false);
       setScanComplete(true);
