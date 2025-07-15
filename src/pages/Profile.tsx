@@ -17,9 +17,11 @@ const Profile = () => {
   }
 
   useEffect(() => {
-    const savedScans = getSavedScans();
-    setScans(savedScans);
-  }, []);
+    if (user?.email) {
+      const savedScans = getSavedScans(user.email);
+      setScans(savedScans);
+    }
+  }, [user]);
 
   const handleGenerateReport = (scan: Scan) => {
     generatePDFReport(scan);
@@ -62,14 +64,14 @@ const Profile = () => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
             <div className="pt-14 flex items-center space-x-6">
               <div className="w-20 h-20 bg-white border-4 border-blue-400 rounded-full flex items-center justify-center text-blue-600 text-2xl font-bold shadow">
-                {user?.name?.charAt(0).toUpperCase()}
+              {user?.firstName?.charAt(0).toUpperCase()}
               </div>
               <div>
                 <h1 className="text-4xl font-bold text-white mb-2">
                   Perfil de Usuario
                 </h1>
                 <p className="text-xl text-blue-100">
-                  Bienvenido, <span className="text-white font-semibold">{user?.name}</span>
+                  Bienvenido, <span className="text-white font-semibold">{user?.firstName ? `${user.firstName} ${user.lastName}` : user?.email}</span>
                 </p>
                 <p className="text-blue-100">{user?.email}</p>
               </div>
@@ -189,7 +191,7 @@ const Profile = () => {
                               }}
                               className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300"
                             >
-                              Generar Reporte PDF
+                              Generar Reporte
                             </button>
                           </div>
                         )}
@@ -208,7 +210,7 @@ const Profile = () => {
                 <div className="space-y-6">
                   <div>
                     <label className="text-gray-500 text-sm">Nombre</label>
-                    <p className="text-gray-900">{user?.name}</p>
+                    <p className="text-gray-900">{user?.firstName ? `${user.firstName} ${user.lastName}` : user?.email}</p>
                   </div>
                   
                   <div>
@@ -218,7 +220,9 @@ const Profile = () => {
                   
                   <div>
                     <label className="text-gray-500 text-sm">Miembro desde</label>
-                    <p className="text-gray-900">Diciembre 2024</p>
+                    <p className="text-gray-900">
+                      {user?.creado_en ? new Date(user.creado_en).toLocaleDateString('es-ES', { year: 'numeric', month: 'long' }) : 'Desconocido'}
+                    </p>
                   </div>
 
                   <div className="pt-6 border-t border-gray-200 space-y-3">

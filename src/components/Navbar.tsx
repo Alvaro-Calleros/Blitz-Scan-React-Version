@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { isAuthenticated, logout, user } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -144,7 +144,7 @@ const Navbar = () => {
               </>
             ) : (
               <>
-                <span className="text-blue-600 font-medium">Hola, {user?.name}</span>
+                <span className="text-blue-600 font-medium">Hola, {user?.firstName ? `${user.firstName} ${user.lastName}` : user?.email}</span>
                 <button onClick={handleLogout} className="text-gray-700 hover:text-blue-600 transition-colors font-medium">
                   Cerrar Sesión
                 </button>
@@ -208,7 +208,7 @@ const Navbar = () => {
                 </>
               ) : (
                 <>
-                  <div className="text-blue-600 py-2 px-4 font-medium">Hola, {user?.name}</div>
+                  <div className="text-blue-600 py-2 px-4 font-medium">Hola, {user?.firstName ? `${user.firstName} ${user.lastName}` : user?.email}</div>
                   <Link 
                     to="/scanner" 
                     className="text-gray-700 hover:text-blue-600 transition-colors py-2 px-4 font-medium"

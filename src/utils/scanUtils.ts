@@ -49,20 +49,23 @@ export const simulateScan = async (url: string, scanType: string): Promise<ScanR
   return results;
 };
 
-export const saveScanToStorage = (scan: Scan): void => {
-  const existingScans = getSavedScans();
-  existingScans.unshift(scan); // Add to beginning
-  
-  // Keep only last 50 scans
-  if (existingScans.length > 50) {
-    existingScans.splice(50);
-  }
-  
-  localStorage.setItem('blitz_scan_history', JSON.stringify(existingScans));
+// Nuevo: obtener la clave de historial para un usuario
+export const getHistoryKey = (userEmail: string) =>
+  `blitz_scan_history_${userEmail}`;
+
+// Guardar historial para usuario
+export const saveScanToStorage = (scan: Scan, userEmail: string): void => {
+  const key = getHistoryKey(userEmail);
+  const existingScans = getSavedScans(userEmail);
+  existingScans.unshift(scan);
+  if (existingScans.length > 50) existingScans.splice(50);
+  localStorage.setItem(key, JSON.stringify(existingScans));
 };
 
-export const getSavedScans = (): Scan[] => {
-  const saved = localStorage.getItem('blitz_scan_history');
+// Leer historial para usuario
+export const getSavedScans = (userEmail: string): Scan[] => {
+  const key = getHistoryKey(userEmail);
+  const saved = localStorage.getItem(key);
   return saved ? JSON.parse(saved) : [];
 };
 
