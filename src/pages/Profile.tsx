@@ -4,12 +4,14 @@ import { useAuth } from '../contexts/AuthContext';
 import { getSavedScans, generatePDFReport, Scan } from '../utils/scanUtils';
 import { toast } from 'sonner';
 import Navbar from '../components/Navbar';
+import AccountSettings from '../components/AccountSettings';
 
 const Profile = () => {
   const [scans, setScans] = useState<Scan[]>([]);
   const [selectedScan, setSelectedScan] = useState<Scan | null>(null);
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [showAccountSettings, setShowAccountSettings] = useState(false); // Added state for AccountSettings modal
 
   if (!isAuthenticated) {
     navigate('/login');
@@ -63,8 +65,12 @@ const Profile = () => {
         <div className="bg-gradient-to-br from-[#4f8cff] to-[#3887f6]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
             <div className="pt-14 flex items-center space-x-6">
-              <div className="w-20 h-20 bg-white border-4 border-blue-400 rounded-full flex items-center justify-center text-blue-600 text-2xl font-bold shadow">
-              {user?.firstName?.charAt(0).toUpperCase()}
+              <div className="w-20 h-20 bg-white border-4 border-blue-400 rounded-full flex items-center justify-center text-blue-600 text-2xl font-bold shadow overflow-hidden">
+                {user?.profileImage ? (
+                  <img src={`http://localhost:3001${user.profileImage}`} alt="Foto de perfil" className="object-cover w-full h-full" />
+                ) : (
+                  user?.firstName?.charAt(0).toUpperCase()
+                )}
               </div>
               <div>
                 <h1 className="text-4xl font-bold text-white mb-2">
@@ -233,7 +239,10 @@ const Profile = () => {
                       Nuevo Escaneo
                     </button>
                     
-                    <button className="w-full border-2 border-blue-600 text-blue-600 bg-white hover:bg-blue-600 hover:text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300">
+                    <button 
+                      className="w-full border-2 border-blue-600 text-blue-600 bg-white hover:bg-blue-600 hover:text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300"
+                      onClick={() => setShowAccountSettings(true)}
+                    >
                       Configurar Cuenta
                     </button>
                     
@@ -273,6 +282,10 @@ const Profile = () => {
           </div>
         </div>
       </div>
+
+      {showAccountSettings && (
+        <AccountSettings onClose={() => setShowAccountSettings(false)} />
+      )}
     </div>
   );
 };

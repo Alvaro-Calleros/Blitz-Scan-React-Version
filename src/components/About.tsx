@@ -1,7 +1,9 @@
 
 import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const About = () => {
+  const { isAuthenticated } = useAuth();
   return (
     <section id="about" className="py-20 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -94,9 +96,12 @@ const About = () => {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/register" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-lg px-8 py-4 rounded-xl transition-all duration-300">
-                Probar Aplicación
-              </Link>
+              {/* Botón Probar Aplicación solo si no está autenticado */}
+              {!isAuthenticated && (
+                <Link to="/register" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-lg px-8 py-4 rounded-xl transition-all duration-300">
+                  Probar Aplicación
+                </Link>
+              )}
               <a 
                 href="#" 
                 className="border-2 border-blue-600 text-blue-600 bg-white hover:bg-blue-600 hover:text-white font-semibold text-lg px-8 py-4 rounded-xl transition-all duration-300"
