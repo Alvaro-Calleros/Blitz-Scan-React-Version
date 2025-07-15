@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import ProfileAvatar from './ProfileAvatar';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -144,9 +145,28 @@ const Navbar = () => {
               </>
             ) : (
               <>
-                <span className="text-blue-600 font-medium">Hola, {user?.name}</span>
-                <button onClick={handleLogout} className="text-gray-700 hover:text-blue-600 transition-colors font-medium">
-                  Cerrar Sesión
+                <Link 
+                  to="/profile" 
+                  className="flex items-center space-x-2 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 px-4 py-2 rounded-full transition-all duration-200 group"
+                >
+                  <ProfileAvatar size="sm" />
+                  <div className="flex flex-col">
+                    <span className="text-blue-700 font-semibold group-hover:text-blue-800 transition-colors">
+                      {user?.name}
+                    </span>
+                  </div>
+                  <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+                <button 
+                  onClick={handleLogout} 
+                  className="flex items-center space-x-2 text-gray-600 hover:text-red-600 transition-all duration-200 font-medium px-3 py-2 rounded-lg hover:bg-red-50 group"
+                >
+                  <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  <span>Cerrar Sesión</span>
                 </button>
               </>
             )}
@@ -208,7 +228,21 @@ const Navbar = () => {
                 </>
               ) : (
                 <>
-                  <div className="text-blue-600 py-2 px-4 font-medium">Hola, {user?.name}</div>
+                  <Link 
+                    to="/profile" 
+                    className="flex items-center space-x-3 py-3 px-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl transition-all duration-200 group"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <ProfileAvatar size="lg" />
+                    <div className="flex flex-col">
+                      <span className="text-blue-700 font-semibold group-hover:text-blue-800 transition-colors">
+                        {user?.name}
+                      </span>
+                    </div>
+                    <svg className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Link>
                   <Link 
                     to="/scanner" 
                     className="text-gray-700 hover:text-blue-600 transition-colors py-2 px-4 font-medium"
@@ -225,9 +259,12 @@ const Navbar = () => {
                   </Link>
                   <button 
                     onClick={handleLogout} 
-                    className="text-gray-700 hover:text-blue-600 transition-colors py-2 px-4 font-medium text-left"
+                    className="flex items-center space-x-3 text-gray-700 hover:text-red-600 transition-all duration-200 py-3 px-4 font-medium text-left hover:bg-red-50 rounded-lg group"
                   >
-                    Cerrar Sesión
+                    <svg className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    <span>Cerrar Sesión</span>
                   </button>
                 </>
               )}

@@ -5,6 +5,7 @@ interface User {
   id: string;
   email: string;
   name: string;
+  profileImage?: string;
 }
 
 interface AuthContextType {
@@ -13,6 +14,8 @@ interface AuthContextType {
   register: (email: string, password: string, name: string) => Promise<boolean>;
   logout: () => void;
   isAuthenticated: boolean;
+  updateProfileImage: (imageUrl: string) => void;
+  updateUserInfo: (name: string, email: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -45,7 +48,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const mockUser = {
         id: Math.random().toString(36),
         email,
-        name: email.split('@')[0]
+        name: email.split('@')[0],
+        profileImage: localStorage.getItem('blitz_scan_profile_image') || undefined
       };
       
       setUser(mockUser);
@@ -65,7 +69,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const mockUser = {
         id: Math.random().toString(36),
         email,
-        name
+        name,
+        profileImage: localStorage.getItem('blitz_scan_profile_image') || undefined
       };
       
       setUser(mockUser);
@@ -74,6 +79,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     
     return false;
+  };
+
+  const updateProfileImage = (imageUrl: string) => {
+    if (user) {
+      const updatedUser = { ...user, profileImage: imageUrl };
+      setUser(updatedUser);
+      localStorage.setItem('blitz_scan_user', JSON.stringify(updatedUser));
+      localStorage.setItem('blitz_scan_profile_image', imageUrl);
+    }
+  };
+
+  const updateUserInfo = (name: string, email: string) => {
+    if (user) {
+      const updatedUser = { ...user, name, email };
+      setUser(updatedUser);
+      localStorage.setItem('blitz_scan_user', JSON.stringify(updatedUser));
+    }
   };
 
   const logout = () => {
@@ -86,7 +108,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     login,
     register,
     logout,
-    isAuthenticated: !!user
+    isAuthenticated: !!user,
+    updateProfileImage,
+    updateUserInfo
   };
 
   return (

@@ -4,10 +4,15 @@ import { useAuth } from '../contexts/AuthContext';
 import { getSavedScans, generatePDFReport, Scan } from '../utils/scanUtils';
 import { toast } from 'sonner';
 import Navbar from '../components/Navbar';
+import ProfileAvatar from '../components/ProfileAvatar';
+import ProfileImageUpload from '../components/ProfileImageUpload';
+import AccountSettings from '../components/AccountSettings';
 
 const Profile = () => {
   const [scans, setScans] = useState<Scan[]>([]);
   const [selectedScan, setSelectedScan] = useState<Scan | null>(null);
+  const [showImageUpload, setShowImageUpload] = useState(false);
+  const [showAccountSettings, setShowAccountSettings] = useState(false);
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -61,15 +66,28 @@ const Profile = () => {
         <div className="bg-gradient-to-br from-[#4f8cff] to-[#3887f6]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
             <div className="pt-14 flex items-center space-x-6">
-              <div className="w-20 h-20 bg-white border-4 border-blue-400 rounded-full flex items-center justify-center text-blue-600 text-2xl font-bold shadow">
-                {user?.name?.charAt(0).toUpperCase()}
+              <div className="relative group">
+                <ProfileAvatar 
+                  size="xl" 
+                  clickable={true} 
+                  onClick={() => {
+                    console.log('Abriendo modal de cambio de foto');
+                    setShowImageUpload(true);
+                  }} 
+                />
+                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-full transition-all duration-200 flex items-center justify-center pointer-events-none">
+                  <svg className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
               </div>
               <div>
                 <h1 className="text-4xl font-bold text-white mb-2">
                   Perfil de Usuario
                 </h1>
                 <p className="text-xl text-blue-100">
-                  Bienvenido, <span className="text-white font-semibold">{user?.name}</span>
+                  <span className="text-white font-semibold">{user?.name}</span>
                 </p>
                 <p className="text-blue-100">{user?.email}</p>
               </div>
@@ -228,11 +246,6 @@ const Profile = () => {
                     >
                       Nuevo Escaneo
                     </button>
-                    
-                    <button className="w-full border-2 border-blue-600 text-blue-600 bg-white hover:bg-blue-600 hover:text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300">
-                      Configurar Cuenta
-                    </button>
-                    
                     <button className="w-full text-gray-500 hover:text-gray-700 transition-colors py-2">
                       Descargar Todos los Reportes
                     </button>
@@ -269,6 +282,9 @@ const Profile = () => {
           </div>
         </div>
       </div>
+      {showImageUpload && (
+        <ProfileImageUpload onClose={() => setShowImageUpload(false)} />
+      )}
     </div>
   );
 };

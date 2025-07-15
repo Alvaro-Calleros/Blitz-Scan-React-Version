@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
+import { scanFuzzing, scanNmap, scanWhois, simulateScan, saveScanToStorage, generatePDFReport, generateScanId, Scan, ScanResult } from '../utils/scanUtils';
 import Navbar from '../components/Navbar';
+import FuzzingResult from '../components/FuzzingResult';
 import WhoisResult from '../components/WhoisResult';
 import NmapResult from '../components/NmapResult';
-import FuzzingResult from '../components/FuzzingResult';
-import { simulateScan, saveScanToStorage, generatePDFReport, generateScanId, Scan, ScanResult, scanFuzzing, scanNmap, scanWhois } from '../utils/scanUtils';
+import ProfileAvatar from '../components/ProfileAvatar';
 
 const Scanner = () => {
   const [url, setUrl] = useState('');
@@ -104,11 +105,16 @@ const Scanner = () => {
     toast.success('Escaneo guardado exitosamente');
   };
 
-  const handleGenerateReport = () => {
+  const handleGenerateReport = async () => {
     if (!currentScan) return;
     
-    generatePDFReport(currentScan);
-    toast.success('Reporte generado y descargado');
+    try {
+      await generatePDFReport(currentScan);
+      toast.success('Reporte generado y descargado');
+    } catch (error) {
+      console.error('Error generating report:', error);
+      toast.error('Error al generar el reporte');
+    }
   };
 
   return (
@@ -126,8 +132,19 @@ const Scanner = () => {
               Escáner de Seguridad
             </h1>
             <p className="text-xl text-blue-50 max-w-3xl mx-auto">
-              Hola de nuevo, <span className="font-semibold">{user?.name}!</span> Analiza sitios web 
-              como un Pentester profesional
+              <Link 
+                to="/profile" 
+                className="inline-flex items-center space-x-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm px-4 py-2 rounded-full transition-all duration-300 group"
+              >
+                <ProfileAvatar size="sm" />
+                <span className="font-semibold text-white group-hover:text-blue-100 transition-colors">
+                  {user?.name}
+                </span>
+                <svg className="w-4 h-4 text-white/70 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+              <span className="block mt-3">Analiza sitios web como un Pentester profesional</span>
             </p>
           </div>
         </div>
@@ -255,7 +272,7 @@ const Scanner = () => {
                   )}
                   
                   {/* Mostrar mensaje si no hay resultados */}
-                  {currentScan.results.length === 0 && !currentScan.extraResult && (
+                  {currentScan.results.length === 0 && !currentScan.extraResult && scanType !== 'whois' && (
                     <div className="text-center py-12">
                       <div className="w-16 h-16 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center">
                         <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

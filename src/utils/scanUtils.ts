@@ -66,7 +66,7 @@ export const getSavedScans = (): Scan[] => {
   return saved ? JSON.parse(saved) : [];
 };
 
-export const generatePDFReport = (scan: Scan): void => {
+export const generatePDFReport = async (scan: Scan): Promise<void> => {
   // In a real application, this would generate a proper PDF
   // For now, we'll create a downloadable text report
   
@@ -88,10 +88,30 @@ Resumen:
 - Rutas accesibles (200): ${scan.results.filter(r => r.http_status === 200).length}
 - Redirecciones: ${scan.results.filter(r => r.is_redirect).length}
 - Errores 4xx: ${scan.results.filter(r => r.http_status >= 400 && r.http_status < 500).length}`;
-  } else if (scan.scan_type === 'nmap' || scan.scan_type === 'whois') {
+  } else if (scan.scan_type === 'nmap') {
     const extraResult = scan.extraResult || 'No hay resultados disponibles';
     resultsSection = `Resultados del Análisis:
 ${extraResult}`;
+  } else if (scan.scan_type === 'whois') {
+    // Para WHOIS, necesitamos obtener los datos directamente
+    try {
+      const whoisData = await scanWhois(scan.url);
+      if (whoisData && whoisData.domain_name) {
+        resultsSection = `Información WHOIS:
+- Dominio: ${whoisData.domain_name}
+- Registrador: ${whoisData.registrar || 'No disponible'}
+- Fecha de creación: ${whoisData.creation_date || 'No disponible'}
+- Fecha de expiración: ${whoisData.expiration_date || 'No disponible'}
+- Fecha de actualización: ${whoisData.updated_date || 'No disponible'}
+- Registrante: ${whoisData.registrant?.name || 'No disponible'}
+- País del registrante: ${whoisData.registrant?.country || 'No disponible'}
+- Servidores DNS: ${Array.isArray(whoisData.name_servers) ? whoisData.name_servers.join(', ') : 'No disponible'}`;
+      } else {
+        resultsSection = 'No se pudo obtener información WHOIS del dominio.';
+      }
+    } catch (error) {
+      resultsSection = 'Error al obtener información WHOIS del dominio.';
+    }
   }
   
   const reportContent = `

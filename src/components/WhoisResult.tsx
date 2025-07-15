@@ -196,11 +196,11 @@ const WhoisResult: React.FC<WhoisResultProps> = ({ url, onComplete }) => {
         <div className="glass-card modern-shadow p-8 flex flex-col items-start animate-fadeInUp">
           <div className="flex items-center mb-3">
             <span className="modern-badge bg-blue-100 text-blue-700 mr-2">Dominio</span>
-            <span className="font-mono font-semibold text-gray-900 text-lg">{domainName}</span>
+            <span className="font-mono font-semibold text-gray-900 text-lg break-all">{domainName}</span>
           </div>
           <div className="flex items-center mb-3">
             <span className="modern-badge bg-purple-100 text-purple-700 mr-2">Registrador</span>
-            <span className="font-semibold text-purple-900 text-base">{registrar}</span>
+            <span className="font-semibold text-purple-900 text-base break-all overflow-x-auto max-w-full">{registrar}</span>
           </div>
         </div>
         <div className="glass-card modern-shadow p-8 flex flex-col items-start animate-fadeInUp">
@@ -220,7 +220,7 @@ const WhoisResult: React.FC<WhoisResultProps> = ({ url, onComplete }) => {
         <div className="glass-card modern-shadow p-8 flex flex-col items-start animate-fadeInUp">
           <div className="flex items-center mb-3">
             <span className="modern-badge bg-pink-100 text-pink-700 mr-2">Registrante</span>
-            <span className="font-semibold text-pink-900 text-base">{registrantName}</span>
+            <span className="font-semibold text-pink-900 text-base break-all overflow-x-auto max-w-full">{registrantName}</span>
           </div>
           <div className="flex items-center mb-3">
             <span className="modern-badge bg-gray-100 text-gray-700 mr-2">País</span>
@@ -230,7 +230,7 @@ const WhoisResult: React.FC<WhoisResultProps> = ({ url, onComplete }) => {
         <div className="glass-card modern-shadow p-8 flex flex-col items-start animate-fadeInUp">
           <div className="flex items-center mb-3">
             <span className="modern-badge bg-teal-100 text-teal-700 mr-2">DNS</span>
-            <span className="font-mono text-teal-900 text-base">
+            <span className="font-mono text-teal-900 text-base break-all overflow-x-auto max-w-full">
               {nameServers.length > 0
                 ? nameServers.slice(0, 2).join(', ')
                 : 'No disponible'}
