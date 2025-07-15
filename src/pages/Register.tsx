@@ -61,11 +61,17 @@ const Register = () => {
     }
     setIsLoading(true);
     try {
-      const success = await register(form.email, form.password, form.firstName + ' ' + form.lastName);
+      const success = await register({
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email,
+        password: form.password,
+        organization: form.organization,
+      });
       if (success) {
         navigate('/scanner');
       } else {
-        setError('Error al crear la cuenta');
+        setError('Error al crear la cuenta. Verifica que el correo no esté registrado.');
       }
     } catch (err: any) {
       setError('Error al registrarse');

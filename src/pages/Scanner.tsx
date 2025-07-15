@@ -98,9 +98,8 @@ const Scanner = () => {
   };
 
   const handleSaveScan = () => {
-    if (!currentScan) return;
-    
-    saveScanToStorage(currentScan);
+    if (!currentScan || !user?.email) return;
+    saveScanToStorage(currentScan, user.email);
     toast.success('Escaneo guardado exitosamente');
   };
 
@@ -126,7 +125,9 @@ const Scanner = () => {
               Escáner de Seguridad
             </h1>
             <p className="text-xl text-blue-50 max-w-3xl mx-auto">
-              Hola de nuevo, <span className="font-semibold">{user?.name}!</span> Analiza sitios web 
+              Hola de nuevo, <span className="font-semibold">
+                {user?.firstName ? `${user.firstName} ${user.lastName}` : user?.email}!
+              </span> Analiza sitios web 
               como un Pentester profesional
             </p>
           </div>

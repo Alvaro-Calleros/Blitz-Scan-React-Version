@@ -88,7 +88,10 @@ def escanear_nmap():
         return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
 
     try:
-        resultado = subprocess.check_output(['nmap', '-F', objetivo], text=True)
+        print(f"Ejecutando Nmap para: {objetivo}")  # <-- Agrega esto
+        resultado = subprocess.check_output([
+            r'C:\Program Files (x86)\Nmap\nmap.exe', '-F', objetivo
+        ], text=True)
         salida = embellecer_nmap(resultado)
     except subprocess.CalledProcessError as e:
         salida = f"❌ Error al ejecutar Nmap:\n{e.output}"
@@ -108,8 +111,8 @@ def escanear_directorios():
 
     try:
         resultado = subprocess.check_output([
-            r'C:\Users\santi\AppData\Local\Programs\Python\Python313\python.exe',
-            r'C:\Users\santi\dirsearch\dirsearch.py',
+            r'C:\Users\alvar\AppData\Local\Programs\Python\Python313\python.exe',
+            r'C:\Users\alvar\dirsearch\dirsearch.py',
             '-u', f'https://{objetivo}',
             '-e', 'php,html,txt',
             '-x', '403,404,520',
