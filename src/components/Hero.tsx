@@ -20,16 +20,29 @@ const Hero = () => {
             TestWeb Secure es una aplicación orientada a la detección de vulnerabilidades web como herramienta profesional para la ciberseguridad de tu sitio web.
           </p>
           <div className="flex flex-row gap-3">
+          {!isAuthenticated && (
             <Link to={isAuthenticated ? "/scanner" : "/register"}>
               <button className="bg-white text-blue-600 border border-white font-semibold py-2 px-6 rounded-full text-base shadow-sm hover:bg-blue-50 transition-all">
                 Comenzar Ahora
               </button>
             </Link>
-            <Link to="/demo">
-              <button className="bg-transparent text-white border border-white font-semibold py-2 px-6 rounded-full text-base shadow-sm hover:bg-white hover:text-blue-600 transition-all">
-                Ver Demo
-              </button>
-            </Link>
+          )}
+            {/* Botón Ver Demo solo si no está autenticado */}
+            {!isAuthenticated && (
+              <Link to="/demo">
+                <button className="bg-transparent text-white border border-white font-semibold py-2 px-6 rounded-full text-base shadow-sm hover:bg-white hover:text-blue-600 transition-all">
+                  Ver Demo
+                </button>
+              </Link>
+            )}
+            {/* Botón Ir al Scanner solo si está autenticado */}
+            {isAuthenticated && (
+              <Link to="/scanner">
+                <button className="bg-white text-blue-600 border border-white font-semibold py-2 px-6 rounded-full text-base shadow-sm hover:bg-blue-50 transition-all">
+                  Ir al Scanner
+                </button>
+              </Link>
+            )}
           </div>
         </div>
         {/* Hero Card */}

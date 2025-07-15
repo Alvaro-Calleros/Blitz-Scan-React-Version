@@ -132,7 +132,7 @@ const Navbar = () => {
           </div>
 
           {/* Right Side - Auth Buttons */}
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden md:flex items-center space-x-4 ml-4">
             {!isAuthenticated ? (
               <>
                 <Link to="/login" className="bg-[#2196f3] hover:bg-[#1976d2] text-white font-semibold py-2 px-7 rounded-full transition-all duration-200 text-base shadow-none">
@@ -143,12 +143,25 @@ const Navbar = () => {
                 </Link>
               </>
             ) : (
-              <>
-                <span className="text-blue-600 font-medium">Hola, {user?.firstName ? `${user.firstName} ${user.lastName}` : user?.email}</span>
+              <div className="flex items-center justify-center gap-3">
+                {user?.profileImage ? (
+                  <img
+                    src={`http://localhost:3001${user.profileImage}`}
+                    alt="Foto de perfil"
+                    className="w-8 h-8 rounded-full object-cover border-2 border-blue-400"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold border-2 border-blue-400">
+                    {user?.firstName?.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <span className="text-blue-600 font-medium flex items-center">
+                  {user?.firstName ? `${user.firstName} ${user.lastName}` : user?.email}
+                </span>
                 <button onClick={handleLogout} className="text-gray-700 hover:text-blue-600 transition-colors font-medium">
                   Cerrar Sesión
                 </button>
-              </>
+              </div>
             )}
           </div>
 
@@ -173,6 +186,24 @@ const Navbar = () => {
         {isMenuOpen && (
           <div className="md:hidden bg-white border-t border-gray-200 shadow-lg">
             <div className="flex flex-col py-4 space-y-2">
+              {isAuthenticated && (
+                <div className="flex items-center justify-center gap-3 py-2 px-4 border-b border-gray-100 mb-2">
+                  {user?.profileImage ? (
+                    <img
+                      src={`http://localhost:3001${user.profileImage}`}
+                      alt="Foto de perfil"
+                      className="w-10 h-10 rounded-full object-cover border-2 border-blue-400"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold border-2 border-blue-400">
+                      {user?.firstName?.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <span className="text-blue-600 font-medium text-lg">
+                    {user?.firstName ? `${user.firstName} ${user.lastName}` : user?.email}
+                  </span>
+                </div>
+              )}
               {!isAuthenticated ? (
                 <>
                   <Link 
@@ -208,7 +239,6 @@ const Navbar = () => {
                 </>
               ) : (
                 <>
-                  <div className="text-blue-600 py-2 px-4 font-medium">Hola, {user?.firstName ? `${user.firstName} ${user.lastName}` : user?.email}</div>
                   <Link 
                     to="/scanner" 
                     className="text-gray-700 hover:text-blue-600 transition-colors py-2 px-4 font-medium"

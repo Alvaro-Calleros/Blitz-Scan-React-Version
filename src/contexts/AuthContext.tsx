@@ -9,10 +9,12 @@ interface User {
   role: string;
   organizacion: string;
   creado_en: string; // <-- Agregado
+  profileImage?: string;
 }
 
 interface AuthContextType {
   user: User | null;
+  setUser: (user: User | null) => void;
   login: (email: string, password: string) => Promise<boolean>;
   register: (form: RegisterForm) => Promise<boolean>;
   logout: () => void;
@@ -97,6 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const value = {
     user,
+    setUser,
     login,
     register,
     logout,
