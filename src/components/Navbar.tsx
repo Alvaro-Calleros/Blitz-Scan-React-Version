@@ -144,20 +144,22 @@ const Navbar = () => {
               </>
             ) : (
               <div className="flex items-center justify-center gap-3">
-                {user?.profileImage ? (
-                  <img
-                    src={`http://localhost:3001${user.profileImage}`}
-                    alt="Foto de perfil"
-                    className="w-8 h-8 rounded-full object-cover border-2 border-blue-400"
-                  />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold border-2 border-blue-400">
-                    {user?.firstName?.charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <span className="text-blue-600 font-medium flex items-center">
-                  {user?.firstName ? `${user.firstName} ${user.lastName}` : user?.email}
-                </span>
+                <Link to="/profile" className="flex items-center gap-3 group" style={{ textDecoration: 'none' }}>
+                  {user?.profileImage ? (
+                    <img
+                      src={`http://localhost:3001${user.profileImage}`}
+                      alt="Foto de perfil"
+                      className="w-8 h-8 rounded-full object-cover border-2 border-blue-400 group-hover:border-blue-600 transition-colors"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold border-2 border-blue-400 group-hover:border-blue-600 transition-colors">
+                      {user?.firstName?.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <span className="text-blue-600 font-medium flex items-center group-hover:underline">
+                    {user?.firstName ? `${user.firstName} ${user.lastName}` : user?.email}
+                  </span>
+                </Link>
                 <button onClick={handleLogout} className="text-gray-700 hover:text-blue-600 transition-colors font-medium">
                   Cerrar Sesión
                 </button>
