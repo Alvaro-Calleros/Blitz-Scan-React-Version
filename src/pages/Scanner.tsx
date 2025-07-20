@@ -21,6 +21,7 @@ const Scanner = () => {
     return null;
   }
 
+  // Agregar en la interfaz una descripcion como se muestra abajo
   const scanTypes = [
     { id: 'fuzzing', name: 'Fuzzing', description: 'Búsqueda de directorios y archivos ocultos' },
     { id: 'nmap', name: 'Nmap Scan', description: 'Escaneo de puertos y servicios' },
@@ -97,6 +98,9 @@ const Scanner = () => {
     }
   };
 
+  // Boton agregar escaneo Visible al bajar una vez realizado un escaneo
+
+  // agregar smoth scroll al Terminar un escaneo -> Directo a los resultados
   const handleSaveScan = () => {
     if (!currentScan || !user?.email) return;
     saveScanToStorage(currentScan, user.email);
@@ -110,6 +114,8 @@ const Scanner = () => {
     toast.success('Reporte generado y descargado');
   };
 
+  // En resultados de los escaneos agregar un Oncursor pointer descripción de cada uno de los componentes como...
+  // Tipos de puertos, detalles como puertos criticos, etc. Asimismo Coincidan dependiendo resultados del escaneo
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
@@ -185,7 +191,7 @@ const Scanner = () => {
                     'Iniciar Escaneo'
                   )}
                 </button>
-
+                {/* Agregar validaciones para cuando un escaneo no lanze problemas. Evitar color ROJO para no confundir al usuario */}
                 {currentScan && currentScan.status === 'completed' && (
                   <div className="flex space-x-3">
                     <button

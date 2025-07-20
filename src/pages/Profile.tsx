@@ -34,9 +34,9 @@ const Profile = () => {
     const icons: { [key: string]: string } = {
       fuzzing: '🔍',
       nmap: '🌐',
-      whois: '📋',
-      sqli: '🛡️',
-      xss: '⚠️'
+      whois: '📋'
+      //sqli: '🛡️',
+      //xss: '⚠️'
     };
     return icons[type] || '🔧';
   };
@@ -56,6 +56,7 @@ const Profile = () => {
     return url.slice(0, maxLength - 3) + '...';
   }
 
+  // Agregar funcion para eliminar escaneos
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
