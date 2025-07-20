@@ -69,6 +69,8 @@ export const getSavedScans = (userEmail: string): Scan[] => {
   return saved ? JSON.parse(saved) : [];
 };
 
+
+// mejorar formatos Nmap y WHOIS
 export const generatePDFReport = (scan: Scan): void => {
   // In a real application, this would generate a proper PDF
   // For now, we'll create a downloadable text report

@@ -11,21 +11,16 @@ import whois
 app = Flask(__name__)
 CORS(app)
 
-# Detectar si estamos en Windows o donde esta instalado el whois
 IS_WINDOWS = platform.system() == 'Windows'
 WHOIS_CMD = 'whois64' if IS_WINDOWS else 'whois'
 
-# 🔧 Utilidad para limpiar dominios o IPs
 def limpiar_objetivo(url):
     print(f"Original URL: {url}")
     
-    # Limpiar la URL de espacios y caracteres extra
     url = url.strip()
     
-    # Remover protocolo si existe (incluyendo errores tipográficos)
     if url.startswith('http://') or url.startswith('https://') or url.startswith('htttps://'):
         try:
-            # Corregir errores tipográficos comunes
             if url.startswith('htttps://'):
                 url = url.replace('htttps://', 'https://')
             
@@ -37,12 +32,10 @@ def limpiar_objetivo(url):
             print(f"Error parsing URL: {e}")
             return url
     
-    # Si es solo un dominio o IP, devolverlo tal como está
     domain = url.strip('/')
     print(f"Final domain: {domain}")
     return domain
 
-# 🎨 Embellecedor de resultados DIRSEARCH
 def embellecer_dirsearch(salida):
     salida_limpia = ["📁 Objetivo escaneado"]
     for linea in salida.splitlines():
@@ -67,7 +60,6 @@ def embellecer_dirsearch(salida):
 
     return '\n'.join(salida_limpia) or '🔍 No se encontraron rutas visibles.'
 
-# 🎨 Embellecedor de resultados NMAP
 def embellecer_nmap(salida):
     lineas = salida.splitlines()
     utiles = [l for l in lineas if 'open' in l]
@@ -88,7 +80,7 @@ def escanear_nmap():
         return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
 
     try:
-        print(f"Ejecutando Nmap para: {objetivo}")  # <-- Agrega esto
+        print(f"Ejecutando Nmap para: {objetivo}")  
         resultado = subprocess.check_output([
             r'C:\Program Files (x86)\Nmap\nmap.exe', '-F', objetivo
         ], text=True)
@@ -101,7 +93,6 @@ def escanear_nmap():
     return jsonify({'resultado': salida})
 
 
-# 📂 Escaneo de directorios con Dirsearch
 @app.route('/dir', methods=['POST'])
 def escanear_directorios():
     objetivo = limpiar_objetivo(request.get_json().get('objetivo', ''))
@@ -118,7 +109,7 @@ def escanear_directorios():
             '-x', '403,404,520',
             '--quiet',
             '--no-color',
-            '--threads', '20'  # más velocidad
+            '--threads', '20'  
         ], text=True, stderr=subprocess.STDOUT)
 
         salida = embellecer_dirsearch(resultado)
@@ -131,7 +122,6 @@ def escanear_directorios():
     return jsonify({'resultado': salida})
 
 
-# 🌐 Consulta WHOIS
 @app.route('/whois', methods=['POST'])
 def escanear_whois():
     objetivo = limpiar_objetivo(request.get_json().get('objetivo', ''))
@@ -142,12 +132,10 @@ def escanear_whois():
     try:
         print(f"WHOIS request for domain: {objetivo}")
         
-        # Intentar primero con python-whois directamente
         try:
             print("Trying python-whois library...")
             info = whois.whois(objetivo)
             
-            # Debug: mostrar todos los campos disponibles
             print("All available fields in python-whois:")
             for field in dir(info):
                 if not field.startswith('_') and not callable(getattr(info, field)):
@@ -155,7 +143,7 @@ def escanear_whois():
                     if value:
                         print(f"  {field}: {value}")
             
-            # Extraer información de manera más robusta
+
             registrar = 'No disponible'
             if info.registrar:
                 registrar = str(info.registrar)
@@ -183,7 +171,6 @@ def escanear_whois():
                 else:
                     updated_date = str(info.updated_date)
             
-            # Buscar información del registrante
             registrant_name = 'No disponible'
             if info.name:
                 registrant_name = str(info.name)
@@ -200,7 +187,6 @@ def escanear_whois():
             elif hasattr(info, 'registrant_country') and info.registrant_country:
                 registrant_country = str(info.registrant_country)
             
-            # Buscar información de contactos
             admin_name = 'No disponible'
             if hasattr(info, 'admin_name') and info.admin_name:
                 admin_name = str(info.admin_name)
@@ -259,7 +245,6 @@ def escanear_whois():
                 'name_servers': name_servers
             }
             
-            # Verificar si tenemos información útil
             has_useful_info = (
                 registrar != 'No disponible' or
                 creation_date != 'No disponible' or

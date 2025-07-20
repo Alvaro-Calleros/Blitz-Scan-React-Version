@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
+// Mejorar seguridad de la contraseña. Agregar validaciones + referencias
 const getPasswordStrength = (password: string) => {
   let strength = 0;
   if (password.length >= 8) strength += 1;
