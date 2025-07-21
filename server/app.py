@@ -71,6 +71,36 @@ def embellecer_nmap(salida):
         salida_limpia.append(f"✅ {l.strip()}")
     return '\n'.join(salida_limpia)
 
+# 🎯 Embellecedor de resultados SUBFINDER
+
+def embellecer_subfinder(salida):
+    dominios = [l.strip() for l in salida.splitlines() if l.strip() and not l.startswith('[-]')]
+    if not dominios:
+        return '🔍 No se encontraron subdominios.'
+    salida_limpia = [f"🔎 Subdominios encontrados: {len(dominios)}"]
+    salida_limpia += [f"✅ {d}" for d in dominios]
+    return '\n'.join(salida_limpia)
+
+# 🎯 Embellecedor de resultados HTTPX
+
+def embellecer_httpx(salida):
+    lines = [l.strip() for l in salida.splitlines() if l.strip()]
+    if not lines:
+        return '🔍 No se encontraron hosts vivos.'
+    salida_limpia = [f"🌐 Hosts vivos detectados: {len(lines)}"]
+    salida_limpia += [f"✅ {l}" for l in lines]
+    return '\n'.join(salida_limpia)
+
+# 🎯 Embellecedor de resultados NUCLEI
+
+def embellecer_nuclei(salida):
+    lines = [l.strip() for l in salida.splitlines() if l.strip()]
+    if not lines:
+        return '🔍 No se detectaron vulnerabilidades.'
+    salida_limpia = [f"🚨 Vulnerabilidades detectadas: {len(lines)}"]
+    salida_limpia += [f"⚠️ {l}" for l in lines]
+    return '\n'.join(salida_limpia)
+
 # 🛰 Escaneo con Nmap
 @app.route('/escanear', methods=['POST'])
 def escanear_nmap():
@@ -102,8 +132,8 @@ def escanear_directorios():
 
     try:
         resultado = subprocess.check_output([
-            r'C:\Users\alvar\AppData\Local\Programs\Python\Python313\python.exe',
-            r'C:\Users\alvar\dirsearch\dirsearch.py',
+            r'C:\Users\santi\AppData\Local\Programs\Python\Python313\python.exe',
+            r'C:\Users\santi\dirsearch\dirsearch.py',
             '-u', f'https://{objetivo}',
             '-e', 'php,html,txt',
             '-x', '403,404,520',
@@ -129,8 +159,8 @@ def escanear_whois():
     if not objetivo:
         return jsonify({'resultado': '❌ No se recibió ningún dominio.'}), 400
 
+    print(f"WHOIS request for domain: {objetivo}")
     try:
-        print(f"WHOIS request for domain: {objetivo}")
         info = whois.whois(objetivo)
 
         # Procesar name servers
@@ -140,35 +170,30 @@ def escanear_whois():
                 name_servers = [str(ns) for ns in info.name_servers]
             else:
                 name_servers = [str(info.name_servers)]
-        
         # Extraer información
         registrar = 'No disponible'
         if info.registrar:
             registrar = str(info.registrar)
         elif hasattr(info, 'registrar_name') and info.registrar_name:
             registrar = str(info.registrar_name)
-        
         creation_date = 'No disponible'
         if info.creation_date:
             if isinstance(info.creation_date, list):
                 creation_date = str(info.creation_date[0])
             else:
                 creation_date = str(info.creation_date)
-        
         expiration_date = 'No disponible'
         if info.expiration_date:
             if isinstance(info.expiration_date, list):
                 expiration_date = str(info.expiration_date[0])
             else:
                 expiration_date = str(info.expiration_date)
-        
         updated_date = 'No disponible'
         if info.updated_date:
             if isinstance(info.updated_date, list):
                 updated_date = str(info.updated_date[0])
             else:
                 updated_date = str(info.updated_date)
-        
         registrant_name = 'No disponible'
         if info.name:
             registrant_name = str(info.name)
@@ -178,13 +203,11 @@ def escanear_whois():
             registrant_name = str(info.registrant_name)
         elif hasattr(info, 'registrant_organization') and info.registrant_organization:
             registrant_name = str(info.registrant_organization)
-        
         registrant_country = 'No disponible'
         if info.country:
             registrant_country = str(info.country)
         elif hasattr(info, 'registrant_country') and info.registrant_country:
             registrant_country = str(info.registrant_country)
-        
         admin_name = 'No disponible'
         if hasattr(info, 'admin_name') and info.admin_name:
             admin_name = str(info.admin_name)
@@ -192,7 +215,6 @@ def escanear_whois():
             admin_name = str(info.admin_organization)
         elif hasattr(info, 'admin_email') and info.admin_email:
             admin_name = str(info.admin_email)
-        
         tech_name = 'No disponible'
         if hasattr(info, 'tech_name') and info.tech_name:
             tech_name = str(info.tech_name)
@@ -200,8 +222,6 @@ def escanear_whois():
             tech_name = str(info.tech_organization)
         elif hasattr(info, 'tech_email') and info.tech_email:
             tech_name = str(info.tech_email)
-        
-        # Crear estructura de datos
         whois_data = {
             'domain_name': objetivo,
             'registrar': registrar,
@@ -234,10 +254,7 @@ def escanear_whois():
             },
             'name_servers': name_servers
         }
-
-        # ¡ESTA ES LA LÍNEA CLAVE!
         return jsonify({'resultado': whois_data})
-
     except Exception as e:
         print(f"Unexpected error in WHOIS: {e}")
         return jsonify({'resultado': f'❌ Error inesperado:\n{str(e)}'})
@@ -309,29 +326,36 @@ def procesar_whois_resultado(whois_output, dominio):
             key = key.strip().lower()
             value = value.strip()
             
+            # Información general del dominio
             if key == 'registrar':
                 info['registrar'] = value
-            elif key in ['created on', 'creation date']:
+            elif key in ['created on', 'creation date', 'created']:
                 info['creation_date'] = value
-            elif key == 'expiration date':
+            elif key in ['expiration date', 'expires', 'expires on']:
                 info['expiration_date'] = value
-            elif key in ['last updated on', 'updated date']:
+            elif key in ['last updated on', 'updated date', 'updated', 'last modified']:
                 info['updated_date'] = value
-            elif key == 'name' and current_section and current_section in info:
-                info[current_section]['name'] = value
-            elif key == 'city' and current_section and current_section in info:
-                info[current_section]['city'] = value
-            elif key == 'state' and current_section and current_section in info:
-                info[current_section]['state'] = value
-            elif key == 'country' and current_section and current_section in info:
-                info[current_section]['country'] = value
-            elif key in ['dns', 'name server'] and current_section == 'name_servers':
-                if value not in info['name_servers']:
+            elif key in ['dns', 'name server', 'nameservers', 'name servers']:
+                if value and value not in info['name_servers']:
                     info['name_servers'].append(value)
+            
+            # Información de contactos según la sección actual
+            elif current_section and current_section in info:
+                if key == 'name':
+                    info[current_section]['name'] = value
+                elif key == 'city':
+                    info[current_section]['city'] = value
+                elif key == 'state':
+                    info[current_section]['state'] = value
+                elif key == 'country':
+                    info[current_section]['country'] = value
+                elif key == 'organization' and info[current_section]['name'] == 'No disponible':
+                    info[current_section]['name'] = value
+                elif key == 'email' and info[current_section]['name'] == 'No disponible':
+                    info[current_section]['name'] = value
     
-    # Si no se encontró información, intentar con un formato alternativo
+    # Si no se encontró información en el formato estructurado, buscar en formato libre
     if info['registrar'] == 'No disponible':
-        # Buscar información en formato alternativo
         for line in lines:
             line = line.strip()
             if ':' in line:
@@ -339,22 +363,95 @@ def procesar_whois_resultado(whois_output, dominio):
                 key = key.strip().lower()
                 value = value.strip()
                 
-                if 'registrar' in key and value:
-                    info['registrar'] = value
-                elif 'created' in key and value:
-                    info['creation_date'] = value
-                elif 'expiration' in key and value:
-                    info['expiration_date'] = value
-                elif 'updated' in key and value:
-                    info['updated_date'] = value
-                elif 'name server' in key or 'dns' in key:
+                # Buscar registrar con diferentes variaciones
+                if any(term in key for term in ['registrar', 'sponsoring registrar', 'registrar name']):
+                    if value and value != 'No disponible':
+                        info['registrar'] = value
+                
+                # Buscar fechas con diferentes variaciones
+                elif any(term in key for term in ['created', 'creation', 'registered']):
+                    if value and value != 'No disponible':
+                        info['creation_date'] = value
+                elif any(term in key for term in ['expiration', 'expires', 'expiry']):
+                    if value and value != 'No disponible':
+                        info['expiration_date'] = value
+                elif any(term in key for term in ['updated', 'modified', 'last modified']):
+                    if value and value != 'No disponible':
+                        info['updated_date'] = value
+                
+                # Buscar name servers con diferentes variaciones
+                elif any(term in key for term in ['name server', 'nameserver', 'dns', 'nserver']):
                     if value and value not in info['name_servers']:
                         info['name_servers'].append(value)
     
-    # Crear salida formateada
-    salida = f"🌐 Información WHOIS\n{json.dumps(info, indent=2, ensure_ascii=False)}"
+    # Verificar si tenemos información útil
+    has_useful_info = (
+        info['registrar'] != 'No disponible' or
+        info['creation_date'] != 'No disponible' or
+        info['expiration_date'] != 'No disponible' or
+        info['updated_date'] != 'No disponible' or
+        len(info['name_servers']) > 0 or
+        any(contact['name'] != 'No disponible' for contact in [info['registrant'], info['admin_contact'], info['tech_contact'], info['billing_contact']])
+    )
+    
+    if has_useful_info:
+        salida = f"🌐 Información WHOIS\n{json.dumps(info, indent=2, ensure_ascii=False)}"
+    else:
+        # Si no se pudo extraer información estructurada, devolver el resultado raw
+        salida = f"🌐 Información WHOIS (Resultado Raw)\n\n{whois_output}"
     
     return salida
+
+# 🕵️‍♂️ Subfinder
+@app.route('/subfinder', methods=['POST'])
+def escanear_subfinder():
+    objetivo = limpiar_objetivo(request.get_json().get('objetivo', ''))
+    if not objetivo:
+        return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
+    try:
+        resultado = subprocess.check_output([
+            r'C:\Users\santi\go\bin\subfinder.exe',
+            '-d', objetivo,
+            '-silent'
+        ], text=True, stderr=subprocess.STDOUT)
+        salida = embellecer_subfinder(resultado)
+    except subprocess.CalledProcessError as e:
+        return jsonify({'resultado': f'❌ Error en Subfinder:\n{e.output}'}), 500
+    except Exception as e:
+        return jsonify({'resultado': f'❌ Error inesperado:\n{str(e)}'}), 500
+    return jsonify({'resultado': salida})
+
+# 🌐 Httpx
+@app.route('/httpx', methods=['POST'])
+def escanear_httpx():
+    objetivo = limpiar_objetivo(request.get_json().get('objetivo', ''))
+    if not objetivo:
+        return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
+    try:
+        # Se espera que el usuario pase una lista de dominios (uno por línea)
+        dominios = request.get_json().get('dominios', None)
+        if not dominios:
+            dominios = [objetivo]
+        if isinstance(dominios, str):
+            dominios = [dominios]
+        # Escribir dominios a un archivo temporal
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, mode='w', encoding='utf-8') as f:
+            for d in dominios:
+                f.write(d + '\n')
+            temp_path = f.name
+        resultado = subprocess.check_output([
+            r'C:\Users\santi\go\bin\httpx.exe',
+            '-l', temp_path,
+            '-silent'
+        ], text=True, stderr=subprocess.STDOUT)
+        os.unlink(temp_path)
+        salida = embellecer_httpx(resultado)
+    except subprocess.CalledProcessError as e:
+        return jsonify({'resultado': f'❌ Error en Httpx:\n{e.output}'}), 500
+    except Exception as e:
+        return jsonify({'resultado': f'❌ Error inesperado:\n{str(e)}'}), 500
+    return jsonify({'resultado': salida})
 
 if __name__ == '__main__':
     app.run(debug=True)
