@@ -6,7 +6,7 @@ import Navbar from '../components/Navbar';
 import WhoisResult from '../components/WhoisResult';
 import NmapResult from '../components/NmapResult';
 import FuzzingResult from '../components/FuzzingResult';
-import { simulateScan, saveScanToStorage, generatePDFReport, generateScanId, Scan, ScanResult, scanFuzzing, scanNmap, scanWhois } from '../utils/scanUtils';
+import { simulateScan, saveScan, generatePDFReport, generateScanId, Scan, ScanResult, scanFuzzing, scanNmap, scanWhois, saveWhoisScan, saveNmapScan, saveFuzzingScan } from '../utils/scanUtils';
 
 const Scanner = () => {
   const [url, setUrl] = useState('');
@@ -67,8 +67,29 @@ const Scanner = () => {
       } else if (scanType === 'nmap') {
         extraResult = await scanNmap(url);
       } else if (scanType === 'whois') {
-        // WHOIS ahora se maneja directamente en el componente
-        extraResult = null;
+        // WHOIS: obtener el objeto JSON plano del backend
+        const res = await fetch('http://localhost:5000/whois', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ objetivo: url })
+        });
+        const data = await res.json();
+        let whoisObject = null;
+        if (data.resultado && typeof data.resultado === 'string') {
+          const jsonStart = data.resultado.indexOf('{');
+          if (jsonStart !== -1) {
+            try {
+              whoisObject = JSON.parse(data.resultado.substring(jsonStart));
+            } catch (e) {
+              whoisObject = data.resultado; // fallback: usar el string si falla el parseo
+            }
+          } else {
+            whoisObject = data.resultado;
+          }
+        } else {
+          whoisObject = data.resultado;
+        }
+        extraResult = whoisObject;
       } else {
         // Fallback a simulación
         results = await simulateScan(url, scanType);
@@ -101,10 +122,21 @@ const Scanner = () => {
   // Boton agregar escaneo Visible al bajar una vez realizado un escaneo
 
   // agregar smoth scroll al Terminar un escaneo -> Directo a los resultados
-  const handleSaveScan = () => {
-    if (!currentScan || !user?.email) return;
-    saveScanToStorage(currentScan, user.email);
-    toast.success('Escaneo guardado exitosamente');
+  const handleSaveScan = async () => {
+    if (!currentScan || !user?.id) return;
+    let success = false;
+    if (currentScan.scan_type === 'whois') {
+      success = await saveWhoisScan(currentScan, parseInt(user.id));
+    } else if (currentScan.scan_type === 'nmap') {
+      success = await saveNmapScan(currentScan, parseInt(user.id));
+    } else if (currentScan.scan_type === 'fuzzing') {
+      success = await saveFuzzingScan(currentScan, parseInt(user.id));
+    }
+    if (success) {
+      toast.success('Escaneo guardado correctamente');
+    } else {
+      toast.error('Error al guardar el escaneo');
+    }
   };
 
   const handleGenerateReport = () => {

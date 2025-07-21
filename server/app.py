@@ -131,171 +131,116 @@ def escanear_whois():
 
     try:
         print(f"WHOIS request for domain: {objetivo}")
-        
-        try:
-            print("Trying python-whois library...")
-            info = whois.whois(objetivo)
-            
-            print("All available fields in python-whois:")
-            for field in dir(info):
-                if not field.startswith('_') and not callable(getattr(info, field)):
-                    value = getattr(info, field)
-                    if value:
-                        print(f"  {field}: {value}")
-            
+        info = whois.whois(objetivo)
 
-            registrar = 'No disponible'
-            if info.registrar:
-                registrar = str(info.registrar)
-            elif hasattr(info, 'registrar_name') and info.registrar_name:
-                registrar = str(info.registrar_name)
-            
-            creation_date = 'No disponible'
-            if info.creation_date:
-                if isinstance(info.creation_date, list):
-                    creation_date = str(info.creation_date[0])
-                else:
-                    creation_date = str(info.creation_date)
-            
-            expiration_date = 'No disponible'
-            if info.expiration_date:
-                if isinstance(info.expiration_date, list):
-                    expiration_date = str(info.expiration_date[0])
-                else:
-                    expiration_date = str(info.expiration_date)
-            
-            updated_date = 'No disponible'
-            if info.updated_date:
-                if isinstance(info.updated_date, list):
-                    updated_date = str(info.updated_date[0])
-                else:
-                    updated_date = str(info.updated_date)
-            
-            registrant_name = 'No disponible'
-            if info.name:
-                registrant_name = str(info.name)
-            elif info.org:
-                registrant_name = str(info.org)
-            elif hasattr(info, 'registrant_name') and info.registrant_name:
-                registrant_name = str(info.registrant_name)
-            elif hasattr(info, 'registrant_organization') and info.registrant_organization:
-                registrant_name = str(info.registrant_organization)
-            
-            registrant_country = 'No disponible'
-            if info.country:
-                registrant_country = str(info.country)
-            elif hasattr(info, 'registrant_country') and info.registrant_country:
-                registrant_country = str(info.registrant_country)
-            
-            admin_name = 'No disponible'
-            if hasattr(info, 'admin_name') and info.admin_name:
-                admin_name = str(info.admin_name)
-            elif hasattr(info, 'admin_organization') and info.admin_organization:
-                admin_name = str(info.admin_organization)
-            elif hasattr(info, 'admin_email') and info.admin_email:
-                admin_name = str(info.admin_email)
-            
-            tech_name = 'No disponible'
-            if hasattr(info, 'tech_name') and info.tech_name:
-                tech_name = str(info.tech_name)
-            elif hasattr(info, 'tech_organization') and info.tech_organization:
-                tech_name = str(info.tech_organization)
-            elif hasattr(info, 'tech_email') and info.tech_email:
-                tech_name = str(info.tech_email)
-            
-            # Procesar name servers
-            name_servers = []
-            if info.name_servers:
-                if isinstance(info.name_servers, list):
-                    name_servers = [str(ns) for ns in info.name_servers]
-                else:
-                    name_servers = [str(info.name_servers)]
-            
-            # Crear estructura de datos
-            whois_data = {
-                'domain_name': objetivo,
-                'registrar': registrar,
-                'creation_date': creation_date,
-                'expiration_date': expiration_date,
-                'updated_date': updated_date,
-                'registrant': {
-                    'name': registrant_name,
-                    'city': str(info.city) if info.city else 'No disponible',
-                    'state': str(info.state) if info.state else 'No disponible',
-                    'country': registrant_country
-                },
-                'admin_contact': {
-                    'name': admin_name,
-                    'city': str(info.admin_city) if hasattr(info, 'admin_city') and info.admin_city else 'No disponible',
-                    'state': str(info.admin_state) if hasattr(info, 'admin_state') and info.admin_state else 'No disponible',
-                    'country': str(info.admin_country) if hasattr(info, 'admin_country') and info.admin_country else 'No disponible'
-                },
-                'tech_contact': {
-                    'name': tech_name,
-                    'city': str(info.tech_city) if hasattr(info, 'tech_city') and info.tech_city else 'No disponible',
-                    'state': str(info.tech_state) if hasattr(info, 'tech_state') and info.tech_state else 'No disponible',
-                    'country': str(info.tech_country) if hasattr(info, 'tech_country') and info.tech_country else 'No disponible'
-                },
-                'billing_contact': {
-                    'name': str(info.billing_name) if hasattr(info, 'billing_name') and info.billing_name else 'No disponible',
-                    'city': str(info.billing_city) if hasattr(info, 'billing_city') and info.billing_city else 'No disponible',
-                    'state': str(info.billing_state) if hasattr(info, 'billing_state') and info.billing_state else 'No disponible',
-                    'country': str(info.billing_country) if hasattr(info, 'billing_country') and info.billing_country else 'No disponible'
-                },
-                'name_servers': name_servers
-            }
-            
-            has_useful_info = (
-                registrar != 'No disponible' or
-                creation_date != 'No disponible' or
-                expiration_date != 'No disponible' or
-                registrant_name != 'No disponible' or
-                len(name_servers) > 0
-            )
-            
-            if has_useful_info:
-                salida = f"🌐 Información WHOIS (via python-whois)\n{json.dumps(whois_data, indent=2, ensure_ascii=False)}"
+        # Procesar name servers
+        name_servers = []
+        if info.name_servers:
+            if isinstance(info.name_servers, list):
+                name_servers = [str(ns) for ns in info.name_servers]
             else:
-                # Si no tenemos información útil, intentar con el comando del sistema
-                print("No useful info from python-whois, trying system command...")
-                raise Exception("No useful info from python-whois")
-                
-        except Exception as e:
-            print(f"python-whois failed: {e}")
-            
-            # Intentar con el comando whois del sistema como fallback
-            try:
-                print(f"Trying system {WHOIS_CMD} command...")
-                resultado = subprocess.check_output([WHOIS_CMD, objetivo], text=True, stderr=subprocess.STDOUT, timeout=30)
-                
-                print(f"WHOIS RAW RESULT FOR {objetivo}:")
-                print("=" * 50)
-                print(resultado)
-                print("=" * 50)
-                
-                # Procesar el resultado del comando whois
-                salida = procesar_whois_resultado(resultado, objetivo)
-                
-                # Si no se encontró información útil, devolver el resultado raw
-                if 'No disponible' in salida and len(resultado.strip()) > 50:
-                    print("No se pudo procesar la información, devolviendo resultado raw")
-                    return jsonify({'resultado': f"🌐 Información WHOIS Raw\n\n{resultado}"})
-                    
-            except FileNotFoundError:
-                print(f"Comando {WHOIS_CMD} no encontrado")
-                salida = f"❌ Error: No se pudo obtener información WHOIS para {objetivo}\n\nComando {WHOIS_CMD} no encontrado en el sistema."
-            except subprocess.CalledProcessError as e:
-                print(f"WHOIS command failed: {e}")
-                salida = f"❌ Error al ejecutar comando WHOIS:\n{e.output}"
-            except Exception as e:
-                print(f"Unexpected error in WHOIS: {e}")
-                salida = f"❌ Error inesperado:\n{str(e)}"
+                name_servers = [str(info.name_servers)]
+        
+        # Extraer información
+        registrar = 'No disponible'
+        if info.registrar:
+            registrar = str(info.registrar)
+        elif hasattr(info, 'registrar_name') and info.registrar_name:
+            registrar = str(info.registrar_name)
+        
+        creation_date = 'No disponible'
+        if info.creation_date:
+            if isinstance(info.creation_date, list):
+                creation_date = str(info.creation_date[0])
+            else:
+                creation_date = str(info.creation_date)
+        
+        expiration_date = 'No disponible'
+        if info.expiration_date:
+            if isinstance(info.expiration_date, list):
+                expiration_date = str(info.expiration_date[0])
+            else:
+                expiration_date = str(info.expiration_date)
+        
+        updated_date = 'No disponible'
+        if info.updated_date:
+            if isinstance(info.updated_date, list):
+                updated_date = str(info.updated_date[0])
+            else:
+                updated_date = str(info.updated_date)
+        
+        registrant_name = 'No disponible'
+        if info.name:
+            registrant_name = str(info.name)
+        elif info.org:
+            registrant_name = str(info.org)
+        elif hasattr(info, 'registrant_name') and info.registrant_name:
+            registrant_name = str(info.registrant_name)
+        elif hasattr(info, 'registrant_organization') and info.registrant_organization:
+            registrant_name = str(info.registrant_organization)
+        
+        registrant_country = 'No disponible'
+        if info.country:
+            registrant_country = str(info.country)
+        elif hasattr(info, 'registrant_country') and info.registrant_country:
+            registrant_country = str(info.registrant_country)
+        
+        admin_name = 'No disponible'
+        if hasattr(info, 'admin_name') and info.admin_name:
+            admin_name = str(info.admin_name)
+        elif hasattr(info, 'admin_organization') and info.admin_organization:
+            admin_name = str(info.admin_organization)
+        elif hasattr(info, 'admin_email') and info.admin_email:
+            admin_name = str(info.admin_email)
+        
+        tech_name = 'No disponible'
+        if hasattr(info, 'tech_name') and info.tech_name:
+            tech_name = str(info.tech_name)
+        elif hasattr(info, 'tech_organization') and info.tech_organization:
+            tech_name = str(info.tech_organization)
+        elif hasattr(info, 'tech_email') and info.tech_email:
+            tech_name = str(info.tech_email)
+        
+        # Crear estructura de datos
+        whois_data = {
+            'domain_name': objetivo,
+            'registrar': registrar,
+            'creation_date': creation_date,
+            'expiration_date': expiration_date,
+            'updated_date': updated_date,
+            'registrant': {
+                'name': registrant_name,
+                'city': str(info.city) if info.city else 'No disponible',
+                'state': str(info.state) if info.state else 'No disponible',
+                'country': registrant_country
+            },
+            'admin_contact': {
+                'name': admin_name,
+                'city': str(info.admin_city) if hasattr(info, 'admin_city') and info.admin_city else 'No disponible',
+                'state': str(info.admin_state) if hasattr(info, 'admin_state') and info.admin_state else 'No disponible',
+                'country': str(info.admin_country) if hasattr(info, 'admin_country') and info.admin_country else 'No disponible'
+            },
+            'tech_contact': {
+                'name': tech_name,
+                'city': str(info.tech_city) if hasattr(info, 'tech_city') and info.tech_city else 'No disponible',
+                'state': str(info.tech_state) if hasattr(info, 'tech_state') and info.tech_state else 'No disponible',
+                'country': str(info.tech_country) if hasattr(info, 'tech_country') and info.tech_country else 'No disponible'
+            },
+            'billing_contact': {
+                'name': str(info.billing_name) if hasattr(info, 'billing_name') and info.billing_name else 'No disponible',
+                'city': str(info.billing_city) if hasattr(info, 'billing_city') and info.billing_city else 'No disponible',
+                'state': str(info.billing_state) if hasattr(info, 'billing_state') and info.billing_state else 'No disponible',
+                'country': str(info.billing_country) if hasattr(info, 'billing_country') and info.billing_country else 'No disponible'
+            },
+            'name_servers': name_servers
+        }
+
+        # ¡ESTA ES LA LÍNEA CLAVE!
+        return jsonify({'resultado': whois_data})
 
     except Exception as e:
         print(f"Unexpected error in WHOIS: {e}")
-        salida = f'❌ Error inesperado:\n{str(e)}'
-
-    return jsonify({'resultado': salida})
+        return jsonify({'resultado': f'❌ Error inesperado:\n{str(e)}'})
 
 def procesar_whois_resultado(whois_output, dominio):
     """Procesa el resultado del comando whois y extrae información relevante"""
