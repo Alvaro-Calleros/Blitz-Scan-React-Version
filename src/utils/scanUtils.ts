@@ -670,6 +670,17 @@ export const scanWhois = async (url: string): Promise<any> => {
   return whoisRaw;
 };
 
+export const scanSubfinder = async (url: string): Promise<string> => {
+  const domain = extractDomain(url);
+  const res = await fetch('http://localhost:5000/subfinder', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ objetivo: domain })
+  });
+  const data = await res.json();
+  return data.resultado || 'No se encontraron subdominios.';
+};
+
 // Función para extraer datos clave de un texto plano de WHOIS y devolver un objeto estructurado
 function parseWhoisTextToObject(text: string, domain: string): any {
   console.log('WHOIS Text Parser - Input:', text);
