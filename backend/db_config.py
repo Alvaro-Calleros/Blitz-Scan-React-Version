@@ -1,10 +1,13 @@
 # backend/db_config.py
-from flask_mysqldb import MySQL
+# Este archivo se mantiene por compatibilidad, pero ahora usa Supabase
+from supabase_config import db
 
 def init_mysql(app):
-    app.config['MYSQL_HOST'] = '127.0.0.1'
-    app.config['MYSQL_USER'] = 'root'
-    app.config['MYSQL_PASSWORD'] = '123456'
-    app.config['MYSQL_DB'] = 'blitz_scan'
-    app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
-    return MySQL(app)
+    """
+    Función de compatibilidad - ahora usa Supabase en lugar de MySQL
+    """
+    print("⚠️  Nota: Esta función ahora usa Supabase en lugar de MySQL")
+    return db
+
+# Para compatibilidad con código existente
+mysql = db
