@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
@@ -6,26 +6,88 @@ import Navbar from '../components/Navbar';
 import WhoisResult from '../components/WhoisResult';
 import NmapResult from '../components/NmapResult';
 import FuzzingResult from '../components/FuzzingResult';
-import { simulateScan, saveScanToStorage, generatePDFReport, generateScanId, Scan, ScanResult, scanFuzzing, scanNmap, scanWhois } from '../utils/scanUtils';
+import { simulateScan, saveScanToStorage, generatePDFReport, generateScanId, Scan, ScanResult, scanFuzzing, scanNmap, scanWhois, scanSubfinder } from '../utils/scanUtils';
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/table';
+import { ChartContainer } from '../components/ui/chart';
+import * as RechartsPrimitive from 'recharts';
 
 const Scanner = () => {
   const [url, setUrl] = useState('');
   const [scanType, setScanType] = useState('fuzzing');
   const [isScanning, setIsScanning] = useState(false);
   const [currentScan, setCurrentScan] = useState<Scan | null>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const resultRef = useRef<HTMLDivElement>(null);
+  const topRef = useRef<HTMLDivElement>(null);
+
+  // Nuevo: estado para categoría seleccionada
+  const scanCategories = [
+    {
+      category: 'Web',
+      types: [
+        { id: 'fuzzing', name: 'Fuzzing', description: 'Búsqueda de directorios y archivos ocultos' },
+        { id: 'subfinder', name: 'Subfinder', description: 'Enumeración de subdominios' },
+      ]
+    },
+    {
+      category: 'Infraestructura',
+      types: [
+        { id: 'nmap', name: 'Nmap Scan', description: 'Escaneo de puertos y servicios' },
+      ]
+    },
+    {
+      category: 'Información',
+      types: [
+        { id: 'whois', name: 'WHOIS Lookup', description: 'Información del dominio y registrante' },
+      ]
+    }
+  ];
+  // Cambiar el estado inicial de selectedCategory a vacío
+  const [selectedCategory, setSelectedCategory] = useState('');
+
+  // Obtener la categoría seleccionada y sus tipos
+  const currentCategory = scanCategories.find(cat => cat.category === selectedCategory);
+  const currentTypes = currentCategory ? currentCategory.types : [];
+
+  // Si el scanType actual no pertenece a la categoría, resetearlo
+  useEffect(() => {
+    if (currentCategory && !currentTypes.some(t => t.id === scanType)) {
+      setScanType(currentTypes[0]?.id || '');
+    }
+    // eslint-disable-next-line
+  }, [selectedCategory]);
+
+  useEffect(() => {
+    if (currentScan && currentScan.status !== 'running' && resultRef.current) {
+      resultRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [currentScan]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight;
+      const windowHeight = window.innerHeight;
+      const isNearTop = scrollTop < 200;
+      const isNearBottom = scrollTop > (scrollHeight - windowHeight - 200);
+      
+      setShowScrollTop(!isNearTop && currentScan && currentScan.status === 'completed');
+      setShowScrollBottom(isNearTop && currentScan && currentScan.status === 'completed');
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    handleScroll(); // Ejecutar una vez al montar
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [currentScan]);
 
   if (!isAuthenticated) {
     navigate('/login');
     return null;
   }
-
-  const scanTypes = [
-    { id: 'fuzzing', name: 'Fuzzing', description: 'Búsqueda de directorios y archivos ocultos' },
-    { id: 'nmap', name: 'Nmap Scan', description: 'Escaneo de puertos y servicios' },
-    { id: 'whois', name: 'WHOIS Lookup', description: 'Información del dominio y registrante' },
-  ];
 
   const handleScan = async () => {
     if (!url.trim()) {
@@ -54,7 +116,7 @@ const Scanner = () => {
     };
 
     setCurrentScan(newScan);
-    toast.info('Iniciando escaneo...');
+    toast.info('Iniciando escaneo...', { duration: 1500 });
 
     try {
       let results: ScanResult[] = [];
@@ -68,9 +130,8 @@ const Scanner = () => {
       } else if (scanType === 'whois') {
         // WHOIS ahora se maneja directamente en el componente
         extraResult = null;
-      } else {
-        // Fallback a simulación
-        results = await simulateScan(url, scanType);
+      } else if (scanType === 'subfinder') {
+        extraResult = await scanSubfinder(url);
       }
       
       const completedScan: Scan = {
@@ -82,7 +143,7 @@ const Scanner = () => {
 
       setCurrentScan(completedScan);
       setIsScanning(false);
-      toast.success('¡Escaneo completado con éxito!');
+      toast.success('¡Escaneo completado con éxito!', { duration: 2000 });
       
     } catch (error) {
       console.error('Scan error:', error);
@@ -110,9 +171,28 @@ const Scanner = () => {
     toast.success('Reporte generado y descargado');
   };
 
+  // Simular datos de estadísticas
+  const simulatedStats = {
+    yourScore: Math.floor(Math.random() * 100),
+    averageScore: 65,
+    sites: [
+      { name: 'Tu sitio', score: Math.floor(Math.random() * 100) },
+      { name: 'Sitio A', score: 80 },
+      { name: 'Sitio B', score: 60 },
+      { name: 'Sitio C', score: 40 },
+    ],
+    breakdown: [
+      { type: 'Fuzzing', value: Math.floor(Math.random() * 100) },
+      { type: 'Nmap', value: Math.floor(Math.random() * 100) },
+      { type: 'WHOIS', value: Math.floor(Math.random() * 100) },
+      { type: 'Subfinder', value: Math.floor(Math.random() * 100) },
+    ]
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
+      <div ref={topRef} />
       
       <div>
         {/* Headeeerr */}
@@ -150,21 +230,38 @@ const Scanner = () => {
                 />
               </div>
 
+              {/* Reemplazar el select de tipo de escaneo por botones visuales agrupados */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Tipo de escaneo
+                  Categoría de escaneo
                 </label>
                 <select
-                  value={scanType}
-                  onChange={(e) => setScanType(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-300 bg-white"
+                  value={selectedCategory}
+                  onChange={e => setSelectedCategory(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-300 bg-white shadow-sm mb-4"
                 >
-                  {scanTypes.map((type) => (
-                    <option key={type.id} value={type.id}>
-                      {type.name}
-                    </option>
+                  <option value="" disabled>Selecciona una categoría...</option>
+                  {scanCategories.map(cat => (
+                    <option key={cat.category} value={cat.category}>{cat.category}</option>
                   ))}
                 </select>
+                {/* Mostrar el select de tipo de escaneo solo si hay categoría seleccionada */}
+                {currentCategory && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Tipo de escaneo
+                    </label>
+                    <select
+                      value={scanType}
+                      onChange={e => setScanType(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-300 bg-white shadow-sm"
+                    >
+                      {currentTypes.map(type => (
+                        <option key={type.id} value={type.id}>{type.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3">
@@ -209,70 +306,147 @@ const Scanner = () => {
 
         {/* Results Section */}
         {currentScan && (
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div ref={resultRef} className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <div className="bg-white rounded-2xl shadow-xl p-8">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Resultados del Escaneo</h2>
-                {currentScan && (
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                    currentScan.status === 'completed' ? 'bg-green-100 text-green-800' :
-                    currentScan.status === 'running' ? 'bg-blue-100 text-blue-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    {currentScan.status === 'completed' && '✅ Completado'}
-                    {currentScan.status === 'running' && '⏳ En progreso'}
-                    {currentScan.status === 'failed' && '❌ Fallido'}
-                  </span>
-                )}
-              </div>
-
-              {isScanning && (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 bg-blue-100 rounded-full mx-auto mb-4 flex items-center justify-center animate-pulse">
-                    <svg className="w-8 h-8 text-blue-600 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  </div>
-                  <p className="text-blue-600 font-medium">Analizando {currentScan?.url}...</p>
-                  <p className="text-gray-500 text-sm mt-2">Ejecutando {scanTypes.find(s => s.id === scanType)?.name}</p>
-                </div>
-              )}
-
-              {currentScan && currentScan.status === 'completed' && (
-                <div className="space-y-6">
-                  {/* Mostrar resultados según el tipo de escaneo */}
-                  {scanType === 'fuzzing' && currentScan.results.length > 0 && (
-                    <FuzzingResult results={currentScan.results} />
-                  )}
-                  
-                  {/* Mostrar resultados de WHOIS */}
-                  {scanType === 'whois' && (
-                    <WhoisResult url={currentScan.url} />
-                  )}
-                  
-                  {/* Mostrar resultados de Nmap */}
-                  {scanType === 'nmap' && currentScan.extraResult && (
-                    <NmapResult result={currentScan.extraResult} />
-                  )}
-                  
-                  {/* Mostrar mensaje si no hay resultados */}
-                  {currentScan.results.length === 0 && !currentScan.extraResult && (
-                    <div className="text-center py-12">
-                      <div className="w-16 h-16 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center">
-                        <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.47-.881-6.08-2.33" />
-                        </svg>
-                      </div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No se encontraron resultados</h3>
-                      <p className="text-gray-500">El escaneo no detectó información relevante para este objetivo.</p>
+              {/* En la cabecera de resultados, agregar el botón de estadísticas */}
+              {/* Envolver el cuadro de resultados y estadísticas en un contenedor 3D para flip */}
+              <div className="relative w-full overflow-hidden" style={{ perspective: '1200px', minHeight: 700, maxHeight: 900, maxWidth: 900, borderRadius: '1rem', margin: '0 auto' }}>
+                <div className={`transition-transform duration-700 ease-in-out`} style={{ transformStyle: 'preserve-3d', width: '100%', minHeight: 700, maxHeight: 900, position: 'relative', transform: showStats ? 'rotateY(180deg)' : 'rotateY(0deg)' }}>
+                  {/* Cara frontal: resultados normales */}
+                  <div className="absolute w-full h-full top-0 left-0 scrollbar-thin scrollbar-thumb-blue-400 scrollbar-track-blue-100 hover:scrollbar-thumb-blue-500" style={{ backfaceVisibility: 'hidden', background: '#fff', borderRadius: '1rem', boxShadow: '0 4px 24px #0001', padding: '2rem', zIndex: 2, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', overflow: 'auto', maxWidth: 900, scrollbarWidth: 'thin', scrollbarColor: '#60a5fa #dbeafe' }}>
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-2xl font-bold text-gray-900">Resultados del Escaneo</h2>
+                      <button
+                        onClick={() => setShowStats(true)}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 text-white font-semibold shadow-lg hover:scale-105 hover:from-blue-600 hover:to-cyan-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400/40"
+                      >
+                        <span className="text-lg">📊</span>
+                        Ver estadísticas
+                      </button>
                     </div>
-                  )}
+                    <div className="space-y-6">
+                      {scanType === 'fuzzing' && currentScan.results.length > 0 && (
+                        <FuzzingResult results={currentScan.results} />
+                      )}
+                      {scanType === 'whois' && (
+                        <WhoisResult url={currentScan.url} />
+                      )}
+                      {scanType === 'nmap' && currentScan.extraResult && (
+                        <NmapResult result={currentScan.extraResult} />
+                      )}
+                      {scanType === 'subfinder' && currentScan.extraResult && (
+                        <div className="glass-card modern-shadow p-8 bg-gradient-to-br from-teal-50 to-cyan-100 animate-fadeInUp">
+                          <div className="flex items-center space-x-4 mb-6">
+                            <div className="w-20 h-20 bg-gradient-to-br from-teal-400 to-cyan-600 rounded-3xl flex items-center justify-center shadow-xl">
+                              <span className="text-white text-4xl">🔎</span>
+                            </div>
+                            <div>
+                              <h3 className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-cyan-800 bg-clip-text text-transparent">Subdominios Encontrados</h3>
+                              <p className="text-teal-800 text-base mt-1">Enumeración avanzada de subdominios</p>
+                            </div>
+                          </div>
+                          <div className="mb-6">
+                            <span className="inline-block bg-teal-200 text-teal-900 rounded-full px-4 py-2 text-lg font-semibold">{(currentScan.extraResult.match(/✅/g) || []).length} subdominios</span>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            {currentScan.extraResult.split('\n').filter(l => l.startsWith('✅')).map((l, idx) => (
+                              <div key={idx} className="bg-teal-100 rounded-xl p-4 flex items-center space-x-3 shadow-md">
+                                <span className="text-teal-600 text-2xl">🌐</span>
+                                <span className="text-lg font-mono text-teal-900 break-all">{l.replace('✅', '').trim()}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Mostrar mensaje si no hay resultados */}
+                      {currentScan.results.length === 0 && !currentScan.extraResult && (
+                        <div className="text-center py-12">
+                          <div className="w-16 h-16 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center">
+                            <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.47-.881-6.08-2.33" />
+                            </svg>
+                          </div>
+                          <h3 className="text-lg font-semibold text-gray-900 mb-2">No se encontraron resultados</h3>
+                          <p className="text-gray-500">El escaneo no detectó información relevante para este objetivo.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {/* Cara trasera: estadísticas */}
+                  <div className="absolute w-full h-full top-0 left-0 scrollbar-thin scrollbar-thumb-blue-400 scrollbar-track-blue-100 hover:scrollbar-thumb-blue-500" style={{ backfaceVisibility: 'hidden', background: '#fff', borderRadius: '1rem', boxShadow: '0 4px 24px #0001', padding: '2rem', zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', transform: 'rotateY(180deg)', overflow: 'auto', maxWidth: 900, maxHeight: 900, scrollbarWidth: 'thin', scrollbarColor: '#60a5fa #dbeafe' }}>
+                    <div className="flex items-center justify-between mb-6 w-full">
+                      <h2 className="text-2xl font-bold text-gray-900">Estadísticas de Vulnerabilidad</h2>
+                      <button
+                        onClick={() => setShowStats(false)}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 text-white font-semibold shadow-lg hover:scale-105 hover:from-cyan-600 hover:to-blue-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400/40"
+                      >
+                        <span className="text-lg">↩️</span>
+                        Ver resultados
+                      </button>
+                    </div>
+                    <div className="w-full flex flex-col items-center justify-center gap-8 overflow-auto" style={{ maxHeight: 700 }}>
+                      <div className="w-full max-w-xl mx-auto mb-8 bg-white rounded-xl p-4 shadow-md">
+                        <ChartContainer config={{ score: { color: '#3b82f6', label: 'Puntaje' } }}>
+                          <RechartsPrimitive.BarChart data={simulatedStats.sites} width={400} height={250}>
+                            <RechartsPrimitive.XAxis dataKey="name" />
+                            <RechartsPrimitive.YAxis />
+                            <RechartsPrimitive.Bar dataKey="score" fill="#3b82f6" />
+                          </RechartsPrimitive.BarChart>
+                        </ChartContainer>
+                      </div>
+                      <div className="w-full max-w-xl mx-auto bg-white rounded-xl p-4 shadow-md">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Sitio</TableHead>
+                              <TableHead>Puntaje de Seguridad</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {simulatedStats.sites.map((site, idx) => (
+                              <TableRow key={idx}>
+                                <TableCell>{site.name}</TableCell>
+                                <TableCell>{site.score}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         )}
       </div>
+      {/* Botón flotante para volver arriba */}
+      {showScrollTop && (
+        <button
+          onClick={() => topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          className="fixed bottom-8 right-8 z-50 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-full shadow-lg p-4 hover:scale-110 transition-transform flex items-center space-x-2"
+          aria-label="Volver arriba"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+          </svg>
+          <span className="hidden sm:inline font-semibold">Ir arriba</span>
+        </button>
+      )}
+      {/* Botón flotante para ir abajo */}
+      {showScrollBottom && (
+        <button
+          onClick={() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          className="fixed bottom-20 right-8 z-50 bg-gradient-to-br from-cyan-500 to-teal-600 text-white rounded-full shadow-lg p-4 hover:scale-110 transition-transform flex items-center space-x-2"
+          aria-label="Ir abajo"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+          <span className="hidden sm:inline font-semibold">Ir abajo</span>
+        </button>
+      )}
     </div>
   );
 };
