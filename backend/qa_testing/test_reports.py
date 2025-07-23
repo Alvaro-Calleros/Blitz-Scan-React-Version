@@ -6,6 +6,11 @@ Script para probar la generación de reportes con diferentes tipos de escaneo
 import json
 import requests
 
+API_BASE = 'http://localhost:3001'
+USER_ID = 4
+SCAN_ID = 1
+SCAN_TYPE = 'nmap'
+
 def test_report_generation():
     """Prueba la generación de reportes con diferentes tipos de escaneo"""
     print("🧪 Probando generación de reportes...")
@@ -233,5 +238,42 @@ def generate_test_report(scan):
     
     return report_content
 
+def test_generate_nmap_report():
+    print('--- TEST: Flujo de generación de reporte IA para Nmap ---')
+    # Paso 1: Obtener escaneos Nmap del usuario
+    url_get = f'{API_BASE}/api/get-nmap-scans/{USER_ID}'
+    resp = requests.get(url_get)
+    if resp.status_code != 200:
+        print(f'❌ Error al obtener escaneos Nmap: {resp.status_code}')
+        return
+    data = resp.json()
+    if not data.get('success') or not data.get('scans'):
+        print('❌ No se encontraron escaneos Nmap para el usuario.')
+        return
+    print(f'✅ Escaneos Nmap obtenidos: {len(data["scans"])}, usando el más reciente.')
+    nmap_scan = data['scans'][0]
+    nmap_data = nmap_scan.get('nmap_data')
+    if not nmap_data:
+        print('❌ El escaneo Nmap no tiene datos nmap_data.')
+        return
+    # Paso 2: Enviar a /generate_report
+    url_report = f'{API_BASE}/generate_report'
+    payload = {
+        'scan_type': SCAN_TYPE,
+        'scan_data': nmap_data if isinstance(nmap_data, str) else str(nmap_data)
+    }
+    resp2 = requests.post(url_report, json=payload)
+    if resp2.status_code != 200:
+        print(f'❌ Error al generar reporte IA: {resp2.status_code}')
+        print(resp2.text)
+        return
+    data2 = resp2.json()
+    if 'report' in data2:
+        print('✅ Reporte IA generado correctamente:')
+        print(data2['report'])
+    else:
+        print('❌ No se recibió reporte IA.')
+
 if __name__ == '__main__':
-    test_report_generation() 
+    test_report_generation()
+    test_generate_nmap_report() 

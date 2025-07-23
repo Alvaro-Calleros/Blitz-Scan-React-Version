@@ -10,6 +10,7 @@ import { simulateScan, saveScan, generatePDFReport, generateScanId, Scan, ScanRe
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/table';
 import { ChartContainer } from '../components/ui/chart';
 import * as RechartsPrimitive from 'recharts';
+import ChatbotModal from '../components/ChatbotModal';
 
 const Scanner = () => {
   const [url, setUrl] = useState('');
@@ -23,6 +24,14 @@ const Scanner = () => {
   const navigate = useNavigate();
   const resultRef = useRef<HTMLDivElement>(null);
   const topRef = useRef<HTMLDivElement>(null);
+  const [scanSaved, setScanSaved] = useState(false); // Nuevo: para saber si el escaneo fue guardado
+  const [saveScanClicked, setSaveScanClicked] = useState(false); // Para evitar doble guardado
+  const [latestNmapScan, setLatestNmapScan] = useState<any | null>(null); // Nuevo: para guardar el escaneo Nmap más reciente
+  const [chatbotOpen, setChatbotOpen] = useState(false); // Para mostrar el modal
+  const [chatbotMessages, setChatbotMessages] = useState<{ sender: 'user' | 'bot'; text: string }[]>([]);
+  const [chatbotLoading, setChatbotLoading] = useState(false);
+  const [chatInput, setChatInput] = useState(''); // Para el input del chat flotante
+  const [dbScanId, setDbScanId] = useState<number | null>(null);
 
   // Nuevo: estado para categoría seleccionada
   const scanCategories = [
@@ -194,26 +203,96 @@ const Scanner = () => {
   // agregar smoth scroll al Terminar un escaneo -> Directo a los resultados
   const handleSaveScan = async () => {
     if (!currentScan || !user?.id) return;
+    if (scanSaved || saveScanClicked) {
+      toast.info('Este escaneo ya fue guardado.');
+      return;
+    }
+    setSaveScanClicked(true);
     let success = false;
     if (currentScan.scan_type === 'whois') {
-      success = await saveWhoisScan(currentScan, parseInt(user.id));
+      const response = await saveWhoisScan(currentScan, parseInt(user.id));
+      if (response && response.scan_id) {
+        setDbScanId(response.scan_id);
+        setScanSaved(true);
+        toast.success('Escaneo guardado correctamente');
+      }
+      success = response.success;
     } else if (currentScan.scan_type === 'nmap') {
-      success = await saveNmapScan(currentScan, parseInt(user.id));
+      const response = await saveNmapScan(currentScan, parseInt(user.id));
+      if (response && response.scan_id) {
+        setDbScanId(response.scan_id);
+        setScanSaved(true);
+        toast.success('Escaneo guardado correctamente');
+      }
+      success = response.success;
     } else if (currentScan.scan_type === 'fuzzing') {
-      success = await saveFuzzingScan(currentScan, parseInt(user.id));
+      const response = await saveFuzzingScan(currentScan, parseInt(user.id));
+      if (response && response.scan_id) {
+        setDbScanId(response.scan_id);
+        setScanSaved(true);
+        toast.success('Escaneo guardado correctamente');
+      }
+      success = response.success;
     }
-    if (success) {
-      toast.success('Escaneo guardado correctamente');
-    } else {
+    if (!success) {
       toast.error('Error al guardar el escaneo');
+      setScanSaved(false);
+      setSaveScanClicked(false);
     }
   };
 
-  const handleGenerateReport = () => {
-    if (!currentScan) return;
-    
-    generatePDFReport(currentScan);
-    toast.success('Reporte generado y descargado');
+  // Paso 2: Obtener el escaneo Nmap más reciente al presionar 'Generar Reporte con IA'
+  const handleGenerateReport = async () => {
+    if (!scanSaved) {
+      toast.error('Primero debes guardar el escaneo antes de generar el reporte con IA');
+      return;
+    }
+    if (!user?.id) {
+      toast.error('Usuario no autenticado');
+      return;
+    }
+    if (!currentScan) {
+      toast.error('No hay escaneo actual para generar el reporte');
+      return;
+    }
+    setChatbotOpen(true);
+    setChatbotMessages([{ sender: 'user', text: 'Genera un reporte de seguridad para mi escaneo.' }]);
+    setChatbotLoading(true);
+    try {
+      let scanType = currentScan.scan_type;
+      let scanData: any = null;
+      if (scanType === 'nmap' || scanType === 'whois') {
+        scanData = currentScan.extraResult;
+      } else if (scanType === 'fuzzing') {
+        scanData = currentScan.results;
+      } else {
+        scanData = currentScan.extraResult || currentScan.results;
+      }
+      const reportRes = await fetch('http://localhost:3001/generate_report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scan_type: scanType, scan_data: typeof scanData === 'string' ? scanData : JSON.stringify(scanData) })
+      });
+      const reportData = await reportRes.json();
+      if (reportData.report) {
+        setChatbotMessages(prev => [
+          ...prev,
+          { sender: 'bot', text: reportData.report }
+        ]);
+      } else {
+        setChatbotMessages(prev => [
+          ...prev,
+          { sender: 'bot', text: 'No se pudo generar el reporte con IA.' }
+        ]);
+      }
+    } catch (error) {
+      setChatbotMessages(prev => [
+        ...prev,
+        { sender: 'bot', text: 'Error al generar el reporte.' }
+      ]);
+    } finally {
+      setChatbotLoading(false);
+    }
   };
 
   // Simular datos de estadísticas
@@ -232,6 +311,65 @@ const Scanner = () => {
       { type: 'WHOIS', value: Math.floor(Math.random() * 100) },
       { type: 'Subfinder', value: Math.floor(Math.random() * 100) },
     ]
+  };
+
+  // Nuevo: función para enviar mensaje libre a Ollama
+  const handleChatbotSend = async () => {
+    if (!chatInput.trim() || chatbotLoading) return;
+    setChatbotMessages(prev => [...prev, { sender: 'user', text: chatInput }]);
+    setChatbotLoading(true);
+    const inputToSend = chatInput;
+    setChatInput(''); // Limpiar input inmediatamente
+    try {
+      const res = await fetch('http://localhost:3001/generate_report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scan_type: 'chat', scan_data: inputToSend })
+      });
+      const data = await res.json();
+      if (data.report) {
+        setChatbotMessages(prev => [...prev, { sender: 'bot', text: data.report }]);
+      } else {
+        setChatbotMessages(prev => [...prev, { sender: 'bot', text: 'No se pudo generar respuesta.' }]);
+      }
+    } catch (error) {
+      setChatbotMessages(prev => [...prev, { sender: 'bot', text: 'Error de conexión con Ollama.' }]);
+    } finally {
+      setChatbotLoading(false);
+    }
+  };
+
+  // Guardar reporte IA
+  const handleSaveReport = async (reportText: string) => {
+    if (!user?.id) {
+      toast.error('Usuario no autenticado');
+      return;
+    }
+    // Buscar el id del escaneo más reciente (Nmap, Fuzzing, Whois)
+    let scanId = dbScanId; // Usa el id real de la base de datos
+    if (!scanId) {
+      toast.error('No se encontró el escaneo para asociar el reporte');
+      return;
+    }
+    try {
+      const res = await fetch('http://localhost:3001/api/save-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          scanId: scanId,
+          reportText: reportText
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Reporte guardado exitosamente');
+      } else {
+        toast.error(data.message || 'Error al guardar el reporte');
+      }
+    } catch (error) {
+      toast.error('Error de conexión al guardar el reporte');
+    }
   };
 
   return (
@@ -333,12 +471,14 @@ const Scanner = () => {
                     <button
                       onClick={handleSaveScan}
                       className="flex-1 btn-primary"
+                      disabled={scanSaved || saveScanClicked}
                     >
                       Guardar Escaneo
                     </button>
                     <button
                       onClick={handleGenerateReport}
                       className="flex-1 btn-primary"
+                      disabled={!scanSaved}
                     >
                       Generar Reporte con IA
                     </button>
@@ -492,6 +632,33 @@ const Scanner = () => {
           <span className="hidden sm:inline font-semibold">Ir abajo</span>
         </button>
       )}
+      {/* Chatbot Modal flotante */}
+      <ChatbotModal
+        open={chatbotOpen}
+        onClose={() => setChatbotOpen(false)}
+        messages={chatbotMessages}
+        loading={chatbotLoading}
+        onSaveReport={handleSaveReport}
+      >
+        <div className="flex gap-2 mt-4">
+          <input
+            type="text"
+            value={chatInput}
+            onChange={e => setChatInput(e.target.value)}
+            className="flex-1 border rounded-lg px-3 py-2"
+            placeholder="Escribe tu mensaje..."
+            onKeyDown={e => { if (e.key === 'Enter') handleChatbotSend(); }}
+            disabled={chatbotLoading}
+          />
+          <button
+            onClick={handleChatbotSend}
+            className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+            disabled={chatbotLoading || !chatInput.trim()}
+          >
+            Enviar
+          </button>
+        </div>
+      </ChatbotModal>
     </div>
   );
 };

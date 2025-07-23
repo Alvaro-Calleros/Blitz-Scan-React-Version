@@ -68,7 +68,7 @@ export const getHistoryKey = (userEmail: string) =>
   `blitz_scan_history_${userEmail}`;
 
 // --- GUARDAR ESCANEO WHOIS ---
-export const saveWhoisScan = async (scan: Scan, userId: number): Promise<boolean> => {
+export const saveWhoisScan = async (scan: Scan, userId: number): Promise<any> => {
   try {
     const response = await fetch('http://localhost:3001/api/save-whois-scan', {
       method: 'POST',
@@ -81,15 +81,15 @@ export const saveWhoisScan = async (scan: Scan, userId: number): Promise<boolean
       })
     });
     const data = await response.json();
-    return !!data.success;
+    return data; // <-- retorna el objeto completo
   } catch (error) {
     console.error('Error guardando escaneo WHOIS:', error);
-    return false;
+    return { success: false };
   }
 };
 
 // --- GUARDAR ESCANEO NMAP ---
-export const saveNmapScan = async (scan: Scan, userId: number): Promise<boolean> => {
+export const saveNmapScan = async (scan: Scan, userId: number): Promise<any> => {
   try {
     const response = await fetch('http://localhost:3001/api/save-nmap-scan', {
       method: 'POST',
@@ -102,15 +102,15 @@ export const saveNmapScan = async (scan: Scan, userId: number): Promise<boolean>
       })
     });
     const data = await response.json();
-    return !!data.success;
+    return data; // <-- retorna el objeto completo
   } catch (error) {
     console.error('Error guardando escaneo NMAP:', error);
-    return false;
+    return { success: false };
   }
 };
 
 // --- GUARDAR ESCANEO FUZZING ---
-export const saveFuzzingScan = async (scan: Scan, userId: number): Promise<boolean> => {
+export const saveFuzzingScan = async (scan: Scan, userId: number): Promise<any> => {
   try {
     const response = await fetch('http://localhost:3001/api/save-fuzzing-scan', {
       method: 'POST',
@@ -123,10 +123,10 @@ export const saveFuzzingScan = async (scan: Scan, userId: number): Promise<boole
       })
     });
     const data = await response.json();
-    return !!data.success;
+    return data; // <-- retorna el objeto completo
   } catch (error) {
     console.error('Error guardando escaneo FUZZING:', error);
-    return false;
+    return { success: false };
   }
 };
 
