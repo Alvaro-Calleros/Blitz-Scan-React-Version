@@ -10,6 +10,8 @@ export default function AccountSettings({ onClose }: { onClose: () => void }) {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [showPasswordFields, setShowPasswordFields] = useState(false);
   const [passwords, setPasswords] = useState({ oldPassword: '', newPassword: '' });
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -122,22 +124,64 @@ export default function AccountSettings({ onClose }: { onClose: () => void }) {
           </button>
           {showPasswordFields && (
             <div className="mt-2 space-y-2 animate-fade-in">
-              <input
-                type="password"
-                name="oldPassword"
-                value={passwords.oldPassword}
-                onChange={e => setPasswords({ ...passwords, oldPassword: e.target.value })}
-                placeholder="Contraseña actual"
-                className="input"
-              />
-              <input
-                type="password"
-                name="newPassword"
-                value={passwords.newPassword}
-                onChange={e => setPasswords({ ...passwords, newPassword: e.target.value })}
-                placeholder="Nueva contraseña"
-                className="input"
-              />
+             <div className="relative">
+                <input
+                  type={showOldPassword ? "text" : "password"}
+                  name="oldPassword"
+                  value={passwords.oldPassword}
+                  onChange={e => setPasswords({ ...passwords, oldPassword: e.target.value })}
+                  placeholder="Contraseña actual"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition placeholder-gray-400 text-gray-900 pr-10"
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-blue-500 focus:outline-none"
+                  onClick={() => setShowOldPassword(v => !v)}
+                  tabIndex={-1}
+                >
+                  {showOldPassword ? (
+                    <svg className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M1.5 12s4.5-7 10.5-7 10.5 7 10.5 7-4.5 7-10.5 7S1.5 12 1.5 12z" />
+                      <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="2" fill="none" />
+                  </svg>
+                    ) : (
+                      <svg className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M1.5 12s4.5-7 10.5-7 10.5 7 10.5 7-4.5 7-10.5 7S1.5 12 1.5 12z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />
+                        <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="2" fill="none" />  
+                    </svg>
+                  )}
+                </button>
+              </div>
+              <div className="relative">
+                <input
+                  type={showNewPassword ? "text" : "password"}
+                  name="newPassword"
+                  value={passwords.newPassword}
+                  onChange={e => setPasswords({ ...passwords, newPassword: e.target.value })}
+                  placeholder="Nueva contraseña"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition placeholder-gray-400 text-gray-900 pr-10"
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-blue-500 focus:outline-none"
+                  onClick={() => setShowNewPassword(v => !v)}
+                  tabIndex={-1}
+                >
+                  {showNewPassword ? (
+                    <svg className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M1.5 12s4.5-7 10.5-7 10.5 7 10.5 7-4.5 7-10.5 7S1.5 12 1.5 12z" />
+                      <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="2" fill="none" />
+                  </svg>
+                    ) : (
+                      <svg className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M1.5 12s4.5-7 10.5-7 10.5 7 10.5 7-4.5 7-10.5 7S1.5 12 1.5 12z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />
+                        <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="2" fill="none" />  
+                    </svg>
+                  )}
+                </button>
+              </div>
               <button
                 onClick={handlePasswordChange}
                 disabled={loading || !passwords.oldPassword || !passwords.newPassword}

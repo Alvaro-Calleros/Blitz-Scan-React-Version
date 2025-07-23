@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import TermsAndPrivacy from '../components/TermsAndPrivacy';
 
 // Mejorar seguridad de la contraseña. Agregar validaciones + referencias
 const getPasswordStrength = (password: string) => {
@@ -29,6 +30,7 @@ const Register = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { register } = useAuth();
+  const [showTermsModal, setShowTermsModal] = useState(false);
 
   const passwordStrength = getPasswordStrength(form.password);
   const passwordMatch = form.password === form.confirmPassword && form.confirmPassword.length > 0;
@@ -179,16 +181,20 @@ const Register = () => {
                   onClick={() => setShowPassword((v) => !v)}
                   aria-label="Mostrar/ocultar contraseña"
                 >
-                  <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    {showPassword ? (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-5.523 0-10-4.477-10-10 0-1.657.336-3.236.938-4.675M15 12a3 3 0 11-6 0 3 3 0 016 0zm6.062-4.675A9.956 9.956 0 0122 9c0 5.523-4.477 10-10 10a9.956 9.956 0 01-4.675-.938" />
-                    ) : (
-                      <>
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </>
-                    )}
-                  </svg>
+                {showPassword ? (
+                    // Ojo abierto (mostrar contraseña)
+                    <svg className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M1.5 12s4.5-7 10.5-7 10.5 7 10.5 7-4.5 7-10.5 7S1.5 12 1.5 12z" />
+                      <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="2" fill="none" />
+                    </svg>
+                  ) : (
+                    // Ojo tachado (ocultar contraseña) - SVG estándar
+                    <svg className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M1.5 12s4.5-7 10.5-7 10.5 7 10.5 7-4.5 7-10.5 7S1.5 12 1.5 12z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />
+                      <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="2" fill="none" />  
+                    </svg>
+                  )}
                 </button>
               </div>
               <div className="mt-2">
@@ -237,16 +243,20 @@ const Register = () => {
                   onClick={() => setShowConfirmPassword((v) => !v)}
                   aria-label="Mostrar/ocultar contraseña"
                 >
-                  <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    {showConfirmPassword ? (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-5.523 0-10-4.477-10-10 0-1.657.336-3.236.938-4.675M15 12a3 3 0 11-6 0 3 3 0 016 0zm6.062-4.675A9.956 9.956 0 0122 9c0 5.523-4.477 10-10 10a9.956 9.956 0 01-4.675-.938" />
-                    ) : (
-                      <>
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </>
-                    )}
-                  </svg>
+                {showConfirmPassword ? (
+                    // Ojo abierto (mostrar contraseña)
+                    <svg className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M1.5 12s4.5-7 10.5-7 10.5 7 10.5 7-4.5 7-10.5 7S1.5 12 1.5 12z" />
+                      <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="2" fill="none" />
+                    </svg>
+                  ) : (
+                    // Ojo tachado (ocultar contraseña) - SVG estándar
+                    <svg className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M1.5 12s4.5-7 10.5-7 10.5 7 10.5 7-4.5 7-10.5 7S1.5 12 1.5 12z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />
+                      <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="2" fill="none" />  
+                    </svg>
+                  )}
                 </button>
               </div>
               {!passwordMatch && form.confirmPassword.length > 0 && (
@@ -265,8 +275,13 @@ const Register = () => {
               />
               <label htmlFor="terms" className="ml-2 block text-sm text-gray-700">
                 Acepto los{' '}
-                <a href="#" className="text-indigo-600 hover:text-indigo-800">Términos de servicio</a> y la{' '}
-                <a href="#" className="text-indigo-600 hover:text-indigo-800">Política de privacidad</a>
+                <button type="button" className="text-indigo-600 hover:text-indigo-800 underline" style={{background:'none',border:'none',padding:0,margin:0,cursor:'pointer'}} onClick={() => setShowTermsModal(true)}>
+                  Términos de servicio
+                </button>
+                {' '}y la{' '}
+                <button type="button" className="text-indigo-600 hover:text-indigo-800 underline" style={{background:'none',border:'none',padding:0,margin:0,cursor:'pointer'}} onClick={() => setShowTermsModal(true)}>
+                  Política de privacidad
+                </button>
               </label>
             </div>
             <div>
@@ -370,6 +385,9 @@ const Register = () => {
           </div>
         </div>
       </div>
+      {showTermsModal && (
+        <TermsAndPrivacy open={showTermsModal} onOpenChange={setShowTermsModal} />
+      )}
       {/* Fondo degradado para el lado derecho */}
       <style>{`
         .gradient-bg {

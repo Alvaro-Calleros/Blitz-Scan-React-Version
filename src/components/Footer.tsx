@@ -55,13 +55,13 @@ const Footer = () => {
             <h3 className="text-white font-semibold mb-4">Recursos</h3>
             <ul className="space-y-2">
               <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
+                <Link to="/documentation" className="text-gray-400 hover:text-white transition-colors">
                   Documentación
-                </a>
+                </Link>
               </li>
               <li>
                 <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                  API Reference
+                  API References
                 </a>
               </li>
               <li>

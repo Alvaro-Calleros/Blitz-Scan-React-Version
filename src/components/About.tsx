@@ -1,9 +1,12 @@
 
 import { Link } from 'react-router-dom';
+import { useState, CSSProperties } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const About = () => {
   const { isAuthenticated } = useAuth();
+  const [showDocumentation, setShowDocumentation] = useState(false);
+
   return (
     <section id="about" className="py-20 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -102,13 +105,12 @@ const About = () => {
                   Probar Aplicación
                 </Link>
               )}
-              <a 
-                href="#" 
+              <Link
+                to="/documentation"
                 className="border-2 border-blue-600 text-blue-600 bg-white hover:bg-blue-600 hover:text-white font-semibold text-lg px-8 py-4 rounded-xl transition-all duration-300"
-                onClick={(e) => e.preventDefault()}
               >
                 Ver Documentación
-              </a>
+              </Link>
             </div>
           </div>
         </div>

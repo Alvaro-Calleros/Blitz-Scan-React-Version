@@ -11,6 +11,7 @@ import Register from "./pages/Register";
 import Scanner from "./pages/Scanner";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
+import Documentation from "./pages/Documentation";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ const App = () => (
               <Route path="/register" element={<Register />} />
               <Route path="/scanner" element={<Scanner />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/documentation" element={<Documentation />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

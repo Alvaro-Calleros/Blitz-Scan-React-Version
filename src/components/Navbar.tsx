@@ -143,7 +143,7 @@ const Navbar = () => {
                 </Link>
               </>
             ) : (
-              <div className="flex items-center justify-center gap-3">
+              <div className="flex items-center justify-center gap-6">
                 <Link to="/profile" className="flex items-center gap-3 group" style={{ textDecoration: 'none' }}>
                   {user?.profileImage ? (
                     <img
