@@ -132,8 +132,8 @@ def escanear_directorios():
 
     try:
         resultado = subprocess.check_output([
-            r'C:\Users\santi\AppData\Local\Programs\Python\Python313\python.exe',
-            r'C:\Users\santi\dirsearch\dirsearch.py',
+            r'C:\Users\LAMorales\AppData\Local\Programs\Python\Python313\python.exe',
+            r'C:\Users\LAMorales\dirsearch\dirsearch.py',
             '-u', f'https://{objetivo}',
             '-e', 'php,html,txt',
             '-x', '403,404,520',
