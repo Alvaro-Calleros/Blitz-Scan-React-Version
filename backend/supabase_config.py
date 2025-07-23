@@ -24,8 +24,11 @@ class SupabaseDB:
         with self.get_connection() as conn:
             with self.get_cursor(conn) as cur:
                 cur.execute(query, params)
-                if query.strip().upper().startswith('SELECT'):
+                upper_query = query.strip().upper()
+                if upper_query.startswith('SELECT'):
                     return cur.fetchall()
+                elif 'RETURNING' in upper_query:
+                    return cur.fetchone()
                 else:
                     conn.commit()
                     return cur.rowcount
