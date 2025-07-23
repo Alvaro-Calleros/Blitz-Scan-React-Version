@@ -6,6 +6,7 @@ import json
 from werkzeug.utils import secure_filename
 from supabase_config import db
 import traceback
+import requests
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": "http://localhost:8080"}})
@@ -91,14 +92,43 @@ def save_scan():
     if not all([user_id, url, scan_type]):
         return jsonify({'success': False, 'message': 'Faltan datos requeridos'}), 400
     try:
-        db.execute_query(
-            'INSERT INTO escaneos (id_usuario, url, tipo_escaneo, estado) VALUES (%s, %s, %s, %s)',
+        # Insertar en escaneos y obtener el id
+        result = db.execute_query(
+            'INSERT INTO escaneos (id_usuario, url, tipo_escaneo, estado) VALUES (%s, %s, %s, %s) RETURNING id',
             (user_id, url, scan_type, 'completado')
         )
+        if isinstance(result, dict) and 'id' in result:
+            escaneo_id = result['id']
+        else:
+            raise Exception('No se pudo obtener el id del escaneo')
+
+        # Guardar en la tabla de detalles según el tipo
+        if scan_type == 'whois':
+            whois_data = data.get('whoisData') or data.get('extraResult')
+            if whois_data:
+                db.execute_query(
+                    'INSERT INTO whois_scans (id_escaneos, whois_data) VALUES (%s, %s)',
+                    (escaneo_id, json.dumps(whois_data))
+                )
+        elif scan_type == 'nmap':
+            nmap_data = data.get('nmapData') or data.get('extraResult')
+            if nmap_data:
+                db.execute_query(
+                    'INSERT INTO nmap_scans (id_escaneos, nmap_data) VALUES (%s, %s)',
+                    (escaneo_id, json.dumps(nmap_data))
+                )
+        elif scan_type == 'fuzzing':
+            fuzzing_data = data.get('fuzzingData') or data.get('results') or data.get('extraResult')
+            if fuzzing_data:
+                db.execute_query(
+                    'INSERT INTO fuzzing_scans (id_escaneos, fuzzing_data) VALUES (%s, %s)',
+                    (escaneo_id, json.dumps(fuzzing_data))
+                )
+
         return jsonify({
             'success': True,
             'message': 'Escaneo guardado exitosamente',
-            'scan_id': 'scan_saved'
+            'scan_id': escaneo_id
         })
     except Exception as e:
         print(f"Error guardando escaneo: {e}")
@@ -173,13 +203,13 @@ def get_scan(scan_id):
         # Buscar datos secundarios según tipo de escaneo
         details = None
         if scan['tipo_escaneo'] == 'whois':
-            whois = db.execute_one('SELECT whois_data FROM whois_scans WHERE id_escaneo = %s', (scan_id,))
+            whois = db.execute_one('SELECT whois_data FROM whois_scans WHERE id_escaneos = %s', (scan_id,))
             details = whois['whois_data'] if whois else None
         elif scan['tipo_escaneo'] == 'nmap':
-            nmap = db.execute_one('SELECT nmap_data FROM nmap_scans WHERE id_escaneo = %s', (scan_id,))
+            nmap = db.execute_one('SELECT nmap_data FROM nmap_scans WHERE id_escaneos = %s', (scan_id,))
             details = nmap['nmap_data'] if nmap else None
         elif scan['tipo_escaneo'] == 'fuzzing':
-            fuzzing = db.execute_one('SELECT fuzzing_data FROM fuzzing_scans WHERE id_escaneo = %s', (scan_id,))
+            fuzzing = db.execute_one('SELECT fuzzing_data FROM fuzzing_scans WHERE id_escaneos = %s', (scan_id,))
             details = fuzzing['fuzzing_data'] if fuzzing else None
         # Construir respuesta: los metadatos + el JSON completo de la tabla secundaria
         response = {
@@ -358,17 +388,15 @@ def save_whois_scan():
             'INSERT INTO escaneos (id_usuario, url, tipo_escaneo, estado) VALUES (%s, %s, %s, %s) RETURNING id',
             (user_id, url, 'whois', estado)
         )
-        if isinstance(result, list) and result and isinstance(result[0], dict) and 'id' in result[0]:
-            escaneo_id = result[0]['id']
-        elif isinstance(result, int):
-            escaneo_id = result
+        if isinstance(result, dict) and 'id' in result:
+            escaneo_id = result['id']
         else:
             raise Exception('No se pudo obtener el id del escaneo')
         db.execute_query(
-            'INSERT INTO whois_scans (id_escaneo, whois_data) VALUES (%s, %s)',
+            'INSERT INTO whois_scans (id_escaneos, whois_data) VALUES (%s, %s)',
             (escaneo_id, json.dumps(whois_data))
         )
-        return jsonify({'success': True, 'message': 'Escaneo WHOIS guardado exitosamente'})
+        return jsonify({'success': True, 'message': 'Escaneo WHOIS guardado exitosamente', 'scan_id': escaneo_id})
     except Exception as e:
         print(f"Error guardando escaneo WHOIS: {e}")
         traceback.print_exc()
@@ -381,7 +409,7 @@ def get_whois_scans(user_id):
             '''
             SELECT e.id, e.url, e.fecha, e.estado, w.whois_data
             FROM escaneos e
-            JOIN whois_scans w ON e.id = w.id_escaneo
+            JOIN whois_scans w ON e.id = w.id_escaneos
             WHERE e.id_usuario = %s AND e.tipo_escaneo = 'whois' AND e.eliminado = FALSE
             ORDER BY e.fecha DESC
             ''',
@@ -412,14 +440,12 @@ def save_nmap_scan():
             'INSERT INTO escaneos (id_usuario, url, tipo_escaneo, estado) VALUES (%s, %s, %s, %s) RETURNING id',
             (user_id, url, 'nmap', estado)
         )
-        if isinstance(result, list) and result and isinstance(result[0], dict) and 'id' in result[0]:
-            escaneo_id = result[0]['id']
-        elif isinstance(result, int):
-            escaneo_id = result
+        if isinstance(result, dict) and 'id' in result:
+            escaneo_id = result['id']
         else:
             raise Exception('No se pudo obtener el id del escaneo')
         db.execute_query(
-            'INSERT INTO nmap_scans (id_escaneo, nmap_data) VALUES (%s, %s)',
+            'INSERT INTO nmap_scans (id_escaneos, nmap_data) VALUES (%s, %s)',
             (escaneo_id, json.dumps(nmap_data))
         )
         return jsonify({'success': True, 'message': 'Escaneo NMAP guardado exitosamente'})
@@ -435,7 +461,7 @@ def get_nmap_scans(user_id):
             '''
             SELECT e.id, e.url, e.fecha, e.estado, n.nmap_data
             FROM escaneos e
-            JOIN nmap_scans n ON e.id = n.id_escaneo
+            JOIN nmap_scans n ON e.id = n.id_escaneos
             WHERE e.id_usuario = %s AND e.tipo_escaneo = 'nmap' AND e.eliminado = FALSE
             ORDER BY e.fecha DESC
             ''',
@@ -466,17 +492,15 @@ def save_fuzzing_scan():
             'INSERT INTO escaneos (id_usuario, url, tipo_escaneo, estado) VALUES (%s, %s, %s, %s) RETURNING id',
             (user_id, url, 'fuzzing', estado)
         )
-        if isinstance(result, list) and result and isinstance(result[0], dict) and 'id' in result[0]:
-            escaneo_id = result[0]['id']
-        elif isinstance(result, int):
-            escaneo_id = result
+        if isinstance(result, dict) and 'id' in result:
+            escaneo_id = result['id']
         else:
             raise Exception('No se pudo obtener el id del escaneo')
         db.execute_query(
-            'INSERT INTO fuzzing_scans (id_escaneo, fuzzing_data) VALUES (%s, %s)',
+            'INSERT INTO fuzzing_scans (id_escaneos, fuzzing_data) VALUES (%s, %s)',
             (escaneo_id, json.dumps(fuzzing_data))
         )
-        return jsonify({'success': True, 'message': 'Escaneo FUZZING guardado exitosamente'})
+        return jsonify({'success': True, 'message': 'Escaneo FUZZING guardado exitosamente', 'scan_id': escaneo_id})
     except Exception as e:
         print(f"Error guardando escaneo FUZZING: {e}")
         traceback.print_exc()
@@ -489,7 +513,7 @@ def get_fuzzing_scans(user_id):
             '''
             SELECT e.id, e.url, e.fecha, e.estado, f.fuzzing_data
             FROM escaneos e
-            JOIN fuzzing_scans f ON e.id = f.id_escaneo
+            JOIN fuzzing_scans f ON e.id = f.id_escaneos
             WHERE e.id_usuario = %s AND e.tipo_escaneo = 'fuzzing' AND e.eliminado = FALSE
             ORDER BY e.fecha DESC
             ''',
@@ -499,6 +523,121 @@ def get_fuzzing_scans(user_id):
     except Exception as e:
         print(f"Error obteniendo escaneos FUZZING: {e}")
         return jsonify({'success': False, 'message': 'Error al obtener escaneos FUZZING'}), 500
+
+
+# IA para generar reportes, LLM local con ollama
+@app.route('/generate_report', methods=['POST'])
+def generate_report():
+    data = request.get_json()
+    scan_type = data.get('scan_type')
+    scan_data = data.get('scan_data')
+
+    if not scan_type or not scan_data:
+        return jsonify({'error': 'Missing scan_type or scan_data'}), 400
+
+    # Prompt por tipo de escaneo, ahora más breve
+    if scan_type == 'nmap':
+        prompt = f"""
+Eres un asistente de ciberseguridad. Vas a recibir un escaneo Nmap en formato JSON o texto. Resume brevemente los puertos abiertos, servicios y vulnerabilidades detectadas. Menciona solo el riesgo principal y una recomendación clave. Sé breve y directo.
+
+Ejemplo:
+JSON: {{"open_ports": [80, 443], "services": ["http", "https"], "vulnerabilities": ["XSS"]}}
+Respuesta: El sitio tiene los puertos 80 (HTTP) y 443 (HTTPS) abiertos y una vulnerabilidad XSS. Riesgo: XSS permite ataques de scripts. Recomendación: aplicar parches y filtrar entradas.
+
+Ahora responde para este escaneo:
+JSON: {scan_data}
+Respuesta:
+"""
+    elif scan_type == 'fuzzing':
+        prompt = f"""
+Eres un asistente de ciberseguridad. Vas a recibir un resultado de fuzzing web en formato JSON o texto. Resume brevemente las rutas encontradas y el riesgo principal. Da solo una recomendación clave. Sé breve y directo.
+
+Ejemplo:
+JSON: [{{"path_found": "/admin", "http_status": 200}}, {{"path_found": "/backup", "http_status": 403}}]
+Respuesta: Se encontró la ruta /admin accesible. Riesgo: acceso no autorizado. Recomendación: proteger /admin con autenticación.
+
+Ahora responde para este escaneo:
+JSON: {scan_data}
+Respuesta:
+"""
+    elif scan_type == 'whois':
+        prompt = f"""
+Eres un asistente de ciberseguridad. Vas a recibir un resultado WHOIS en formato JSON. Resume brevemente el estado del dominio y una advertencia clave si aplica. Da solo una recomendación principal. Sé breve y directo.
+
+Ejemplo:
+JSON: {{"domain_name": "example.com", "registrar": "GoDaddy", "creation_date": "2020-01-01", "expiration_date": "2025-01-01", "registrant": {{"name": "John Doe", "country": "US"}}}}
+Respuesta: El dominio example.com está activo y registrado en GoDaddy. Advertencia: expira en 2025. Recomendación: activar renovación automática.
+
+Ahora responde para este escaneo:
+JSON: {scan_data}
+Respuesta:
+"""
+    else:
+        prompt = f"""
+Eres un asistente de ciberseguridad. Responde de forma breve y profesional a la consulta del usuario. Si es posible, resume en una frase el riesgo principal y una recomendación.
+
+Consulta: {scan_data}
+Respuesta:
+"""
+
+    ollama_url = "http://localhost:11434/api/generate"
+    payload = {
+        "model": "llama3",
+        "prompt": prompt,
+        "stream": False
+    }
+    try:
+        print("Enviando payload a Ollama:", payload)
+        response = requests.post(ollama_url, json=payload, timeout=300)
+        print("Status code Ollama:", response.status_code)
+        print("Respuesta Ollama:", response.text)
+        response.raise_for_status()
+        result = response.json()
+        report = result.get("response", "No report generated.")
+        return jsonify({"report": report})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Ollama error: {str(e)}"}), 500
+
+# --- ENDPOINT PARA GUARDAR REPORTE DE IA ---
+@app.route('/api/save-report', methods=['POST'])
+def save_report():
+    data = request.json
+    user_id = data.get('userId')
+    scan_id = data.get('scanId')
+    report_text = data.get('reportText')
+    if not all([user_id, scan_id, report_text]):
+        return jsonify({'success': False, 'message': 'Faltan datos requeridos'}), 400
+    try:
+        # Verificar que el escaneo pertenece al usuario
+        scan = db.execute_one('SELECT * FROM escaneos WHERE id = %s AND id_usuario = %s', (scan_id, user_id))
+        if not scan:
+            return jsonify({'success': False, 'message': 'Escaneo no encontrado o no autorizado'}), 404
+        # Guardar el reporte como JSONB (puede ser solo texto plano)
+        db.execute_query(
+            'INSERT INTO reportes (id_escaneos, reporte_data) VALUES (%s, %s)',
+            (scan_id, json.dumps({'reporte': report_text}))
+        )
+        return jsonify({'success': True, 'message': 'Reporte guardado exitosamente'})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'Error al guardar el reporte: {str(e)}'}), 500
+
+# --- ENDPOINT PARA OBTENER REPORTE DE IA DE UN ESCANEO ---
+@app.route('/api/get-report/<int:scan_id>', methods=['GET'])
+def get_report(scan_id):
+    try:
+        reporte = db.execute_one('SELECT * FROM reportes WHERE id_escaneos = %s ORDER BY created_at DESC LIMIT 1', (scan_id,))
+        if not reporte:
+            return jsonify({'success': False, 'message': 'No se encontró reporte para este escaneo'}), 404
+        return jsonify({'success': True, 'reporte': reporte['reporte_data'], 'created_at': reporte['created_at']})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'Error al obtener el reporte: {str(e)}'}), 500
+
 
 if __name__ == '__main__':
     app.run(port=3001, debug=True)

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getAllScans, getScanById, Scan } from '../utils/scanUtils';
@@ -13,6 +13,10 @@ const Profile = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [showAccountSettings, setShowAccountSettings] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [detailModalContent, setDetailModalContent] = useState<any>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportModalContent, setReportModalContent] = useState<any>(null);
 
   if (!isAuthenticated) {
     navigate('/login');
@@ -82,14 +86,32 @@ const Profile = () => {
         detalle = data.scans.find((s: any) => String(s.id) === String(scan.id));
       }
       if (detalle) {
-        // Imprimir en la terminal del navegador
-        console.log('DETALLE DEL ESCANEO:', detalle);
-        toast.success('Detalle extraído. Revisa la consola.');
+        setDetailModalContent(detalle);
+        setShowDetailModal(true);
+        toast.success('Detalle extraído.');
       } else {
         toast.error('No se encontró el detalle para este escaneo');
       }
     } catch (error) {
       toast.error('Error al obtener detalles del escaneo');
+      console.error(error);
+    }
+  };
+
+  // Nueva función para mostrar el reporte IA
+  const handleShowReport = async (scan: Scan) => {
+    try {
+      const res = await fetch(`http://localhost:3001/api/get-report/${scan.id}`);
+      const data = await res.json();
+      if (data.success && data.reporte) {
+        setReportModalContent(data.reporte);
+        setShowReportModal(true);
+        toast.success('Reporte extraído.');
+      } else {
+        toast.error(data.message || 'No se encontró reporte para este escaneo');
+      }
+    } catch (error) {
+      toast.error('Error al obtener el reporte');
       console.error(error);
     }
   };
@@ -196,7 +218,7 @@ const Profile = () => {
                           </div>
                         </div>
                         {selectedScan?.id === scan.id && (
-                          <div className="mt-6 pt-6 border-t border-gray-200">
+                          <div className="mt-6 pt-6 border-t border-gray-200 flex gap-3">
                             <button
                               onClick={e => {
                                 e.stopPropagation();
@@ -205,6 +227,15 @@ const Profile = () => {
                               className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300"
                             >
                               Ver Detalles
+                            </button>
+                            <button
+                              onClick={e => {
+                                e.stopPropagation();
+                                handleShowReport(scan);
+                              }}
+                              className="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300"
+                            >
+                              Ver Reporte
                             </button>
                           </div>
                         )}
@@ -277,6 +308,46 @@ const Profile = () => {
           </div>
         </div>
       </div>
+      {/* Modal de detalles del escaneo */}
+      {showDetailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-8 relative animate-fadeInUp">
+            <button
+              onClick={() => setShowDetailModal(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl font-bold"
+              aria-label="Cerrar detalles"
+            >
+              ×
+            </button>
+            <h2 className="text-2xl font-bold mb-4 text-blue-700 flex items-center gap-2">
+              📄 Detalles del Escaneo
+            </h2>
+            <pre className="bg-gray-100 rounded-lg p-4 text-sm max-h-96 overflow-auto whitespace-pre-wrap">
+              {JSON.stringify(detailModalContent, null, 2)}
+            </pre>
+          </div>
+        </div>
+      )}
+      {/* Modal de reporte IA */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-8 relative animate-fadeInUp">
+            <button
+              onClick={() => setShowReportModal(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl font-bold"
+              aria-label="Cerrar reporte"
+            >
+              ×
+            </button>
+            <h2 className="text-2xl font-bold mb-4 text-green-700 flex items-center gap-2">
+              🧠 Reporte IA Generado
+            </h2>
+            <pre className="bg-gray-100 rounded-lg p-4 text-sm max-h-96 overflow-auto whitespace-pre-wrap">
+              {typeof reportModalContent === 'string' ? reportModalContent : JSON.stringify(reportModalContent, null, 2)}
+            </pre>
+          </div>
+        </div>
+      )}
       {showAccountSettings && (
         <AccountSettings onClose={() => setShowAccountSettings(false)} />
       )}

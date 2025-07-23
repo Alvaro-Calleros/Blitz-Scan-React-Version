@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import whois
+import requests
 
 app = Flask(__name__)
 CORS(app)
@@ -410,45 +411,13 @@ def escanear_subfinder():
         return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
     try:
         resultado = subprocess.check_output([
-            r'C:\Users\santi\go\bin\subfinder.exe',
+            r'C:\Users\alvar\go\bin\subfinder.exe',
             '-d', objetivo,
             '-silent'
         ], text=True, stderr=subprocess.STDOUT)
         salida = embellecer_subfinder(resultado)
     except subprocess.CalledProcessError as e:
         return jsonify({'resultado': f'❌ Error en Subfinder:\n{e.output}'}), 500
-    except Exception as e:
-        return jsonify({'resultado': f'❌ Error inesperado:\n{str(e)}'}), 500
-    return jsonify({'resultado': salida})
-
-# 🌐 Httpx
-@app.route('/httpx', methods=['POST'])
-def escanear_httpx():
-    objetivo = limpiar_objetivo(request.get_json().get('objetivo', ''))
-    if not objetivo:
-        return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
-    try:
-        # Se espera que el usuario pase una lista de dominios (uno por línea)
-        dominios = request.get_json().get('dominios', None)
-        if not dominios:
-            dominios = [objetivo]
-        if isinstance(dominios, str):
-            dominios = [dominios]
-        # Escribir dominios a un archivo temporal
-        import tempfile
-        with tempfile.NamedTemporaryFile(delete=False, mode='w', encoding='utf-8') as f:
-            for d in dominios:
-                f.write(d + '\n')
-            temp_path = f.name
-        resultado = subprocess.check_output([
-            r'C:\Users\santi\go\bin\httpx.exe',
-            '-l', temp_path,
-            '-silent'
-        ], text=True, stderr=subprocess.STDOUT)
-        os.unlink(temp_path)
-        salida = embellecer_httpx(resultado)
-    except subprocess.CalledProcessError as e:
-        return jsonify({'resultado': f'❌ Error en Httpx:\n{e.output}'}), 500
     except Exception as e:
         return jsonify({'resultado': f'❌ Error inesperado:\n{str(e)}'}), 500
     return jsonify({'resultado': salida})
