@@ -40,9 +40,21 @@ const ChatbotModal: React.FC<ChatbotModalProps> = ({ open, onClose, messages, lo
           {messages.map((msg, idx) => (
             <div
               key={idx}
-              className={`rounded-xl px-4 py-2 text-base max-w-[90%] ${msg.sender === 'user' ? 'bg-blue-100 self-end text-right' : msg.text.toLowerCase().includes('error') ? 'bg-red-100 text-red-700 self-start text-left' : 'bg-gray-100 self-start text-left'}`}
+              className={`rounded-xl px-4 py-2 text-base max-w-[90%] ${
+                msg.sender === 'user'
+                  ? 'bg-blue-100 self-end text-right'
+                  : msg.text.toLowerCase().includes('error')
+                  ? 'bg-red-100 text-red-700 self-start text-left'
+                  : 'bg-gray-100 self-start text-left'
+              }`}
             >
-              {msg.text}
+              {msg.sender === 'bot' ? (
+                <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0 }}>
+                  {msg.text}
+                </pre>
+              ) : (
+                msg.text
+              )}
             </div>
           ))}
           {loading && (

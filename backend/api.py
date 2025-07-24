@@ -7,6 +7,9 @@ from werkzeug.utils import secure_filename
 from supabase_config import db
 import traceback
 import requests
+import openai
+
+OPENAI_API_KEY = "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"
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": "http://localhost:8080"}})
@@ -448,7 +451,7 @@ def save_nmap_scan():
             'INSERT INTO nmap_scans (id_escaneos, nmap_data) VALUES (%s, %s)',
             (escaneo_id, json.dumps(nmap_data))
         )
-        return jsonify({'success': True, 'message': 'Escaneo NMAP guardado exitosamente'})
+        return jsonify({'success': True, 'message': 'Escaneo NMAP guardado exitosamente', 'scan_id': escaneo_id})
     except Exception as e:
         print(f"Error guardando escaneo NMAP: {e}")
         traceback.print_exc()
@@ -538,67 +541,102 @@ def generate_report():
     # Prompt por tipo de escaneo, ahora más breve
     if scan_type == 'nmap':
         prompt = f"""
-Eres un asistente de ciberseguridad. Vas a recibir un escaneo Nmap en formato JSON o texto. Resume brevemente los puertos abiertos, servicios y vulnerabilidades detectadas. Menciona solo el riesgo principal y una recomendación clave. Sé breve y directo.
+Eres un experto en ciberseguridad. Recibirás el resultado de un escaneo Nmap en formato JSON o texto. 
+Analiza los puertos abiertos, servicios detectados y vulnerabilidades. 
+Proporciona un resumen profesional que incluya:
+- Puertos y servicios relevantes encontrados.
+- Vulnerabilidades o riesgos detectados (si los hay).
+- Una recomendación clara y prioritaria para mitigar el riesgo principal.
 
-Ejemplo:
-JSON: {{"open_ports": [80, 443], "services": ["http", "https"], "vulnerabilities": ["XSS"]}}
-Respuesta: El sitio tiene los puertos 80 (HTTP) y 443 (HTTPS) abiertos y una vulnerabilidad XSS. Riesgo: XSS permite ataques de scripts. Recomendación: aplicar parches y filtrar entradas.
+Ejemplo de entrada:
+{{
+  "open_ports": [22, 80, 443],
+  "services": ["ssh", "http", "https"],
+  "vulnerabilities": ["SSH outdated", "XSS"]
+}}
 
-Ahora responde para este escaneo:
-JSON: {scan_data}
-Respuesta:
+Ejemplo de respuesta:
+Se detectaron los puertos 22 (SSH), 80 (HTTP) y 443 (HTTPS) abiertos. Riesgo: el servicio SSH está desactualizado y hay una vulnerabilidad XSS. 
+Recomendación: Actualizar SSH y aplicar filtros de entrada para prevenir XSS.
+
+Ahora analiza este escaneo:
+{scan_data}
 """
     elif scan_type == 'fuzzing':
         prompt = f"""
-Eres un asistente de ciberseguridad. Vas a recibir un resultado de fuzzing web en formato JSON o texto. Resume brevemente las rutas encontradas y el riesgo principal. Da solo una recomendación clave. Sé breve y directo.
+Eres un experto en ciberseguridad web. Recibirás resultados de un fuzzing web en formato JSON o texto.
+Analiza las rutas encontradas, los códigos de estado HTTP y posibles riesgos.
+Proporciona un resumen profesional que incluya:
+- Rutas sensibles o peligrosas detectadas.
+- Riesgo principal asociado a las rutas encontradas.
+- Una recomendación prioritaria para mitigar el riesgo.
 
-Ejemplo:
-JSON: [{{"path_found": "/admin", "http_status": 200}}, {{"path_found": "/backup", "http_status": 403}}]
-Respuesta: Se encontró la ruta /admin accesible. Riesgo: acceso no autorizado. Recomendación: proteger /admin con autenticación.
+Ejemplo de entrada:
+[
+  {{"path_found": "/admin", "http_status": 200}},
+  {{"path_found": "/backup", "http_status": 403}}
+]
 
-Ahora responde para este escaneo:
-JSON: {scan_data}
-Respuesta:
+Ejemplo de respuesta:
+Se encontró la ruta /admin accesible públicamente. Riesgo: acceso no autorizado a panel de administración. 
+Recomendación: Restringir el acceso a /admin mediante autenticación robusta.
+
+Ahora analiza este resultado de fuzzing:
+{scan_data}
 """
     elif scan_type == 'whois':
         prompt = f"""
-Eres un asistente de ciberseguridad. Vas a recibir un resultado WHOIS en formato JSON. Resume brevemente el estado del dominio y una advertencia clave si aplica. Da solo una recomendación principal. Sé breve y directo.
+Eres un experto en ciberseguridad y análisis de dominios. Recibirás un resultado WHOIS en formato JSON.
+Analiza el estado del dominio, fechas de expiración, registrante y cualquier advertencia relevante.
+Proporciona un resumen profesional que incluya:
+- Estado actual del dominio y su registrador.
+- Advertencia clave (por ejemplo, expiración próxima, datos públicos, etc.).
+- Una recomendación principal para mejorar la seguridad o gestión del dominio.
 
-Ejemplo:
-JSON: {{"domain_name": "example.com", "registrar": "GoDaddy", "creation_date": "2020-01-01", "expiration_date": "2025-01-01", "registrant": {{"name": "John Doe", "country": "US"}}}}
-Respuesta: El dominio example.com está activo y registrado en GoDaddy. Advertencia: expira en 2025. Recomendación: activar renovación automática.
+Ejemplo de entrada:
+{{
+  "domain_name": "example.com",
+  "registrar": "GoDaddy",
+  "creation_date": "2020-01-01",
+  "expiration_date": "2025-01-01",
+  "registrant": {{"name": "John Doe", "country": "US"}}
+}}
 
-Ahora responde para este escaneo:
-JSON: {scan_data}
-Respuesta:
+Ejemplo de respuesta:
+El dominio example.com está registrado en GoDaddy y expira en 2025. Advertencia: los datos del registrante son públicos. 
+Recomendación: activar privacidad WHOIS y renovación automática.
+
+Ahora analiza este resultado WHOIS:
+{scan_data}
 """
     else:
         prompt = f"""
-Eres un asistente de ciberseguridad. Responde de forma breve y profesional a la consulta del usuario. Si es posible, resume en una frase el riesgo principal y una recomendación.
+Eres un experto en ciberseguridad. Analiza la siguiente información y proporciona:
+- Un resumen profesional del riesgo principal detectado.
+- Una recomendación prioritaria para mitigar el riesgo.
 
-Consulta: {scan_data}
-Respuesta:
+Consulta:
+{scan_data}
 """
 
-    ollama_url = "http://localhost:11434/api/generate"
-    payload = {
-        "model": "llama3",
-        "prompt": prompt,
-        "stream": False
-    }
     try:
-        print("Enviando payload a Ollama:", payload)
-        response = requests.post(ollama_url, json=payload, timeout=300)
-        print("Status code Ollama:", response.status_code)
-        print("Respuesta Ollama:", response.text)
-        response.raise_for_status()
-        result = response.json()
-        report = result.get("response", "No report generated.")
+        client = openai.OpenAI(api_key=OPENAI_API_KEY)
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "Eres un asistente de ciberseguridad."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=400,
+            temperature=0.7
+        )
+        report = response.choices[0].message.content
         return jsonify({"report": report})
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return jsonify({"error": f"Ollama error: {str(e)}"}), 500
+        # Siempre devolver un campo 'report' para el frontend
+        return jsonify({"report": f"Error al generar el reporte con IA: {str(e)}"}), 200
 
 # --- ENDPOINT PARA GUARDAR REPORTE DE IA ---
 @app.route('/api/save-report', methods=['POST'])

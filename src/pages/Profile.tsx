@@ -116,6 +116,30 @@ const Profile = () => {
     }
   };
 
+  // Nueva función para ocultar (soft delete) un escaneo
+  const handleHideScan = async (scanId: string) => {
+    if (!user?.id) return;
+    try {
+      const res = await fetch('http://localhost:3001/api/hide-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scanId, userId: user.id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Escaneo eliminado correctamente');
+        // Actualizar la lista de escaneos
+        setScans(prev => prev.filter(s => String(s.id) !== String(scanId)));
+        setSelectedScan(null);
+      } else {
+        toast.error(data.message || 'No se pudo ocultar el escaneo');
+      }
+    } catch (error) {
+      toast.error('Error al eliminar el escaneo');
+      console.error(error);
+    }
+  };
+
   const getScanTypeIcon = (type: string) => {
     const icons: { [key: string]: string } = {
       fuzzing: '🔍',
@@ -236,6 +260,15 @@ const Profile = () => {
                               className="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300"
                             >
                               Ver Reporte
+                            </button>
+                            <button
+                              onClick={e => {
+                                e.stopPropagation();
+                                handleHideScan(scan.id);
+                              }}
+                              className="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300"
+                            >
+                              Eliminar
                             </button>
                           </div>
                         )}
