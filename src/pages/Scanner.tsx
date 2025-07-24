@@ -113,6 +113,8 @@ const Scanner = () => {
     }
 
     setIsScanning(true);
+    setScanSaved(false); // Reset al iniciar nuevo escaneo
+    setSaveScanClicked(false); // Reset al iniciar nuevo escaneo
     const scanId = generateScanId();
     
     const newScan: Scan = {
@@ -208,33 +210,19 @@ const Scanner = () => {
       return;
     }
     setSaveScanClicked(true);
-    let success = false;
+    let response = null;
     if (currentScan.scan_type === 'whois') {
-      const response = await saveWhoisScan(currentScan, parseInt(user.id));
-      if (response && response.scan_id) {
-        setDbScanId(response.scan_id);
-        setScanSaved(true);
-        toast.success('Escaneo guardado correctamente');
-      }
-      success = response.success;
+      response = await saveWhoisScan(currentScan, parseInt(user.id));
     } else if (currentScan.scan_type === 'nmap') {
-      const response = await saveNmapScan(currentScan, parseInt(user.id));
-      if (response && response.scan_id) {
-        setDbScanId(response.scan_id);
-        setScanSaved(true);
-        toast.success('Escaneo guardado correctamente');
-      }
-      success = response.success;
+      response = await saveNmapScan(currentScan, parseInt(user.id));
     } else if (currentScan.scan_type === 'fuzzing') {
-      const response = await saveFuzzingScan(currentScan, parseInt(user.id));
-      if (response && response.scan_id) {
-        setDbScanId(response.scan_id);
-        setScanSaved(true);
-        toast.success('Escaneo guardado correctamente');
-      }
-      success = response.success;
+      response = await saveFuzzingScan(currentScan, parseInt(user.id));
     }
-    if (!success) {
+    if (response && response.success) {
+      if (response.scan_id) setDbScanId(response.scan_id);
+      setScanSaved(true);
+      toast.success('Escaneo guardado correctamente');
+    } else {
       toast.error('Error al guardar el escaneo');
       setScanSaved(false);
       setSaveScanClicked(false);
