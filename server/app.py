@@ -9,25 +9,21 @@ import re
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import whois
+import requests
 
 app = Flask(__name__)
 CORS(app)
 
-# Detectar si estamos en Windows o donde esta instalado el whois
 IS_WINDOWS = platform.system() == 'Windows'
 WHOIS_CMD = 'whois64' if IS_WINDOWS else 'whois'
 
-# 🔧 Utilidad para limpiar dominios o IPs
 def limpiar_objetivo(url):
     print(f"Original URL: {url}")
     
-    # Limpiar la URL de espacios y caracteres extra
     url = url.strip()
     
-    # Remover protocolo si existe (incluyendo errores tipográficos)
     if url.startswith('http://') or url.startswith('https://') or url.startswith('htttps://'):
         try:
-            # Corregir errores tipográficos comunes
             if url.startswith('htttps://'):
                 url = url.replace('htttps://', 'https://')
             
@@ -39,12 +35,10 @@ def limpiar_objetivo(url):
             print(f"Error parsing URL: {e}")
             return url
     
-    # Si es solo un dominio o IP, devolverlo tal como está
     domain = url.strip('/')
     print(f"Final domain: {domain}")
     return domain
 
-# 🎨 Embellecedor de resultados DIRSEARCH
 def embellecer_dirsearch(salida):
     salida_limpia = ["📁 Objetivo escaneado"]
     for linea in salida.splitlines():
@@ -69,7 +63,6 @@ def embellecer_dirsearch(salida):
 
     return '\n'.join(salida_limpia) or '🔍 No se encontraron rutas visibles.'
 
-# 🎨 Embellecedor de resultados NMAP
 def embellecer_nmap(salida):
     lineas = salida.splitlines()
     utiles = [l for l in lineas if 'open' in l]
@@ -150,7 +143,10 @@ def escanear_nmap():
         return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
 
     try:
-        resultado = subprocess.check_output(['nmap', '-F', objetivo], text=True)
+        print(f"Ejecutando Nmap para: {objetivo}")  
+        resultado = subprocess.check_output([
+            r'C:\Program Files (x86)\Nmap\nmap.exe', '-F', objetivo
+        ], text=True)
         salida = embellecer_nmap(resultado)
     except subprocess.CalledProcessError as e:
         salida = f"❌ Error al ejecutar Nmap:\n{e.output}"
@@ -160,7 +156,6 @@ def escanear_nmap():
     return jsonify({'resultado': salida})
 
 
-# 📂 Escaneo de directorios con Dirsearch
 @app.route('/dir', methods=['POST'])
 def escanear_directorios():
     objetivo = limpiar_objetivo(request.get_json().get('objetivo', ''))
@@ -170,14 +165,14 @@ def escanear_directorios():
 
     try:
         resultado = subprocess.check_output([
-            r'C:\Users\santi\AppData\Local\Programs\Python\Python313\python.exe',
-            r'C:\Users\santi\dirsearch\dirsearch.py',
+            r'C:\Users\alvar\AppData\Local\Programs\Python\Python313\python.exe',
+            r'C:\Users\alvar\dirsearch\dirsearch.py',
             '-u', f'https://{objetivo}',
             '-e', 'php,html,txt',
             '-x', '403,404,520',
             '--quiet',
             '--no-color',
-            '--threads', '20'  # más velocidad
+            '--threads', '20'  
         ], text=True, stderr=subprocess.STDOUT)
 
         salida = embellecer_dirsearch(resultado)
@@ -190,7 +185,6 @@ def escanear_directorios():
     return jsonify({'resultado': salida})
 
 
-# 🌐 Consulta WHOIS
 @app.route('/whois', methods=['POST'])
 def escanear_whois():
     objetivo = limpiar_objetivo(request.get_json().get('objetivo', ''))
@@ -199,41 +193,40 @@ def escanear_whois():
         return jsonify({'resultado': '❌ No se recibió ningún dominio.'}), 400
 
     print(f"WHOIS request for domain: {objetivo}")
-    
-    # Intentar primero con python-whois
     try:
-        print("Trying python-whois library...")
         info = whois.whois(objetivo)
-        
-        # Extraer información de manera más robusta
+
+        # Procesar name servers
+        name_servers = []
+        if info.name_servers:
+            if isinstance(info.name_servers, list):
+                name_servers = [str(ns) for ns in info.name_servers]
+            else:
+                name_servers = [str(info.name_servers)]
+        # Extraer información
         registrar = 'No disponible'
         if info.registrar:
             registrar = str(info.registrar)
         elif hasattr(info, 'registrar_name') and info.registrar_name:
             registrar = str(info.registrar_name)
-        
         creation_date = 'No disponible'
         if info.creation_date:
             if isinstance(info.creation_date, list):
                 creation_date = str(info.creation_date[0])
             else:
                 creation_date = str(info.creation_date)
-        
         expiration_date = 'No disponible'
         if info.expiration_date:
             if isinstance(info.expiration_date, list):
                 expiration_date = str(info.expiration_date[0])
             else:
                 expiration_date = str(info.expiration_date)
-        
         updated_date = 'No disponible'
         if info.updated_date:
             if isinstance(info.updated_date, list):
                 updated_date = str(info.updated_date[0])
             else:
                 updated_date = str(info.updated_date)
-        
-        # Buscar información del registrante
         registrant_name = 'No disponible'
         if info.name:
             registrant_name = str(info.name)
@@ -243,14 +236,11 @@ def escanear_whois():
             registrant_name = str(info.registrant_name)
         elif hasattr(info, 'registrant_organization') and info.registrant_organization:
             registrant_name = str(info.registrant_organization)
-        
         registrant_country = 'No disponible'
         if info.country:
             registrant_country = str(info.country)
         elif hasattr(info, 'registrant_country') and info.registrant_country:
             registrant_country = str(info.registrant_country)
-        
-        # Buscar información de contactos
         admin_name = 'No disponible'
         if hasattr(info, 'admin_name') and info.admin_name:
             admin_name = str(info.admin_name)
@@ -258,7 +248,6 @@ def escanear_whois():
             admin_name = str(info.admin_organization)
         elif hasattr(info, 'admin_email') and info.admin_email:
             admin_name = str(info.admin_email)
-        
         tech_name = 'No disponible'
         if hasattr(info, 'tech_name') and info.tech_name:
             tech_name = str(info.tech_name)
@@ -266,16 +255,6 @@ def escanear_whois():
             tech_name = str(info.tech_organization)
         elif hasattr(info, 'tech_email') and info.tech_email:
             tech_name = str(info.tech_email)
-        
-        # Procesar name servers
-        name_servers = []
-        if info.name_servers:
-            if isinstance(info.name_servers, list):
-                name_servers = [str(ns) for ns in info.name_servers]
-            else:
-                name_servers = [str(info.name_servers)]
-        
-        # Crear estructura de datos
         whois_data = {
             'domain_name': objetivo,
             'registrar': registrar,
@@ -308,56 +287,10 @@ def escanear_whois():
             },
             'name_servers': name_servers
         }
-        
-        # Verificar si tenemos información útil
-        has_useful_info = (
-            registrar != 'No disponible' or
-            creation_date != 'No disponible' or
-            expiration_date != 'No disponible' or
-            registrant_name != 'No disponible' or
-            len(name_servers) > 0
-        )
-        
-        if has_useful_info:
-            salida = f"🌐 Información WHOIS\n{json.dumps(whois_data, indent=2, ensure_ascii=False)}"
-            return jsonify({'resultado': salida})
-        
-        # Si no tenemos información útil, continuar con el comando del sistema
-        print("No useful info from python-whois, trying system command...")
-        
-    except Exception as e:
-        print(f"python-whois failed: {e}")
-        # Continuar con el comando del sistema
-    
-    # Intentar con el comando whois del sistema como fallback
-    try:
-        print(f"Trying system {WHOIS_CMD} command...")
-        resultado = subprocess.check_output([WHOIS_CMD, objetivo], text=True, stderr=subprocess.STDOUT, timeout=30)
-        
-        print(f"WHOIS RAW RESULT FOR {objetivo}:")
-        print("=" * 50)
-        print(resultado)
-        print("=" * 50)
-        
-        # Procesar el resultado del comando whois
-        salida = procesar_whois_resultado(resultado, objetivo)
-        
-        # Si no se encontró información útil en el procesamiento, devolver el resultado raw
-        if 'No disponible' in salida and len(resultado.strip()) > 50:
-            print("No se pudo procesar la información, devolviendo resultado raw")
-            return jsonify({'resultado': f"🌐 Información WHOIS\n\n{resultado}"})
-        
-        return jsonify({'resultado': salida})
-        
-    except FileNotFoundError:
-        print(f"Comando {WHOIS_CMD} no encontrado")
-        return jsonify({'resultado': f"❌ Error: No se pudo obtener información WHOIS para {objetivo}\n\nComando {WHOIS_CMD} no encontrado en el sistema."}), 500
-    except subprocess.CalledProcessError as e:
-        print(f"WHOIS command failed: {e}")
-        return jsonify({'resultado': f"❌ Error al ejecutar comando WHOIS:\n{e.output}"}), 500
+        return jsonify({'resultado': whois_data})
     except Exception as e:
         print(f"Unexpected error in WHOIS: {e}")
-        return jsonify({'resultado': f"❌ Error inesperado:\n{str(e)}"}), 500
+        return jsonify({'resultado': f'❌ Error inesperado:\n{str(e)}'})
 
 def procesar_whois_resultado(whois_output, dominio):
     """Procesa el resultado del comando whois y extrae información relevante"""
@@ -510,7 +443,7 @@ def escanear_subfinder():
         return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
     try:
         resultado = subprocess.check_output([
-            r'C:\Users\santi\go\bin\subfinder.exe',
+            r'C:\Users\alvar\go\bin\subfinder.exe',
             '-d', objetivo,
             '-silent'
         ], text=True, stderr=subprocess.STDOUT)

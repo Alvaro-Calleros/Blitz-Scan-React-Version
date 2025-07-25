@@ -35,6 +35,7 @@ const Login = () => {
     }
   };
 
+  // Agregar navbar para mejorar experiencia de usuario
   return (
     <div className="min-h-screen bg-[#f5f7fa] flex items-center justify-center">
       <div className="w-full max-w-4xl flex rounded-xl shadow-lg overflow-hidden bg-white">
