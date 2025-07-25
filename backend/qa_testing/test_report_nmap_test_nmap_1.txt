@@ -1,0 +1,38 @@
+REPORTE DE ESCANEO - BLITZ SCAN
+===========================================
+
+📋 INFORMACIÓN DEL ESCANEO:
+   • URL objetivo: https://upsin.edu.mx
+   • Tipo de escaneo: NMAP
+   • Fecha: 2024-01-15T12:00:00Z
+   • Estado: completed
+   • ID del escaneo: test_nmap_1
+
+🌐 RESULTADOS DE NMAP:
+📡 Puertos abiertos detectados:
+
+✅ 22/tcp open ssh OpenSSH 8.2p1 Ubuntu 4ubuntu0.5 (Ubuntu Linux; protocol 2.0)
+✅ 80/tcp open http nginx 1.18.0 (Ubuntu)
+✅ 443/tcp open https nginx 1.18.0 (Ubuntu)
+✅ 3306/tcp open mysql MySQL 8.0.32-0ubuntu0.20.04.2
+
+🔍 Resumen:
+• Total de puertos escaneados: 100
+• Puertos abiertos: 4
+• Servicios detectados: SSH, HTTP, HTTPS, MySQL
+
+===========================================
+🔒 RECOMENDACIONES DE SEGURIDAD:
+   • Revisar rutas accesibles no autorizadas
+   • Verificar configuración de redirecciones
+   • Implementar controles de acceso apropiados
+   • Ocultar información sensible en headers
+   • Mantener servicios actualizados
+   • Configurar firewalls apropiadamente
+   • Monitorear logs de acceso regularmente
+   • Realizar auditorías de seguridad periódicas
+
+===========================================
+📄 Generado por BlitzScan
+🕐 Fecha: 2024-01-15 12:00:00
+🌐 Herramienta de Ciberseguridad Profesional

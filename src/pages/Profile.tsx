@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getSavedScans, generatePDFReport, Scan } from '../utils/scanUtils';
+import { getAllScans, getScanById, Scan } from '../utils/scanUtils';
 import { toast } from 'sonner';
 import Navbar from '../components/Navbar';
 import AccountSettings from '../components/AccountSettings';
@@ -11,7 +11,12 @@ const Profile = () => {
   const [selectedScan, setSelectedScan] = useState<Scan | null>(null);
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [showAccountSettings, setShowAccountSettings] = useState(false); // Added state for AccountSettings modal
+  const location = useLocation();
+  const [showAccountSettings, setShowAccountSettings] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [detailModalContent, setDetailModalContent] = useState<any>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportModalContent, setReportModalContent] = useState<any>(null);
 
   if (!isAuthenticated) {
     navigate('/login');
@@ -19,24 +24,127 @@ const Profile = () => {
   }
 
   useEffect(() => {
-    if (user?.email) {
-      const savedScans = getSavedScans(user.email);
-      setScans(savedScans);
-    }
-  }, [user]);
+    const loadScans = async () => {
+      if (user?.id) {
+        try {
+          const allScans = await getAllScans(parseInt(user.id));
+          setScans(allScans);
+        } catch (error) {
+          toast.error('Error al cargar el historial de escaneos');
+        }
+      }
+    };
+    loadScans();
+    // Se recarga cada vez que entras al perfil o cambia el usuario
+  }, [user?.id, location.pathname]);
 
-  const handleGenerateReport = (scan: Scan) => {
-    generatePDFReport(scan);
-    toast.success('Reporte generado y descargado');
+  // Descargar datos del escaneo como txt plano (JSON.stringify)
+  const handleDownloadScanData = async (scanId: string) => {
+    const scan = await getScanById(Number(scanId));
+    if (!scan) {
+      toast.error('No se pudo obtener el escaneo');
+      return;
+    }
+    // Permitir descargar siempre, pero advertir si no hay detalles
+    const isEmpty =
+      (scan.scan_type === 'fuzzing' && (!Array.isArray(scan.results) || scan.results.length === 0)) ||
+      ((scan.scan_type === 'whois' || scan.scan_type === 'nmap') && (!scan.extraResult || Object.keys(scan.extraResult).length === 0));
+    if (isEmpty) {
+      toast.warning('Este escaneo no tiene detalles completos, pero puedes descargar el registro.');
+    }
+    const blob = new Blob([JSON.stringify(scan, null, 2)], { type: 'text/plain; charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `blitzscan_data_${scanId}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    toast.success('Datos descargados');
+  };
+
+  // Nueva función para mostrar detalles del escaneo según tipo
+  const handleShowScanDetails = async (scan: Scan) => {
+    let endpoint = '';
+    if (scan.scan_type === 'whois') {
+      endpoint = `http://localhost:3001/api/get-whois-scans/${user?.id}`;
+    } else if (scan.scan_type === 'nmap') {
+      endpoint = `http://localhost:3001/api/get-nmap-scans/${user?.id}`;
+    } else if (scan.scan_type === 'fuzzing') {
+      endpoint = `http://localhost:3001/api/get-fuzzing-scans/${user?.id}`;
+    } else {
+      toast.error('Tipo de escaneo no soportado');
+      return;
+    }
+    try {
+      const res = await fetch(endpoint);
+      const data = await res.json();
+      // Buscar el escaneo por id
+      let detalle = null;
+      if (Array.isArray(data.scans)) {
+        detalle = data.scans.find((s: any) => String(s.id) === String(scan.id));
+      }
+      if (detalle) {
+        setDetailModalContent(detalle);
+        setShowDetailModal(true);
+        toast.success('Detalle extraído.');
+      } else {
+        toast.error('No se encontró el detalle para este escaneo');
+      }
+    } catch (error) {
+      toast.error('Error al obtener detalles del escaneo');
+      console.error(error);
+    }
+  };
+
+  // Nueva función para mostrar el reporte IA
+  const handleShowReport = async (scan: Scan) => {
+    try {
+      const res = await fetch(`http://localhost:3001/api/get-report/${scan.id}`);
+      const data = await res.json();
+      if (data.success && data.reporte) {
+        setReportModalContent(data.reporte);
+        setShowReportModal(true);
+        toast.success('Reporte extraído.');
+      } else {
+        toast.error(data.message || 'No se encontró reporte para este escaneo');
+      }
+    } catch (error) {
+      toast.error('Error al obtener el reporte');
+      console.error(error);
+    }
+  };
+
+  // Nueva función para ocultar (soft delete) un escaneo
+  const handleHideScan = async (scanId: string) => {
+    if (!user?.id) return;
+    try {
+      const res = await fetch('http://localhost:3001/api/hide-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scanId, userId: user.id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Escaneo eliminado correctamente');
+        // Actualizar la lista de escaneos
+        setScans(prev => prev.filter(s => String(s.id) !== String(scanId)));
+        setSelectedScan(null);
+      } else {
+        toast.error(data.message || 'No se pudo ocultar el escaneo');
+      }
+    } catch (error) {
+      toast.error('Error al eliminar el escaneo');
+      console.error(error);
+    }
   };
 
   const getScanTypeIcon = (type: string) => {
     const icons: { [key: string]: string } = {
       fuzzing: '🔍',
       nmap: '🌐',
-      whois: '📋',
-      sqli: '🛡️',
-      xss: '⚠️'
+      whois: '📋'
     };
     return icons[type] || '🔧';
   };
@@ -50,7 +158,6 @@ const Profile = () => {
     }
   };
 
-  // Función para truncar URLs largas
   function truncateUrl(url: string, maxLength = 35) {
     if (url.length <= maxLength) return url;
     return url.slice(0, maxLength - 3) + '...';
@@ -59,7 +166,6 @@ const Profile = () => {
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
-      
       <div>
         {/* Header */}
         <div className="bg-gradient-to-br from-[#4f8cff] to-[#3887f6]">
@@ -86,38 +192,11 @@ const Profile = () => {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-xl shadow-sm p-6 text-center border border-gray-200">
-              <div className="text-3xl font-bold text-blue-600 mb-2">{scans.length}</div>
-              <div className="text-gray-600">Escaneos Totales</div>
-            </div>
-            <div className="bg-white rounded-xl shadow-sm p-6 text-center border border-gray-200">
-              <div className="text-3xl font-bold text-green-600 mb-2">
-                {scans.filter(s => s.status === 'completed').length}
-              </div>
-              <div className="text-gray-600">Completados</div>
-            </div>
-            <div className="bg-white rounded-xl shadow-sm p-6 text-center border border-gray-200">
-              <div className="text-3xl font-bold text-yellow-600 mb-2">
-                {scans.reduce((total, scan) => total + scan.results.length, 0)}
-              </div>
-              <div className="text-gray-600">Vulnerabilidades</div>
-            </div>
-            <div className="bg-white rounded-xl shadow-sm p-6 text-center border border-gray-200">
-              <div className="text-3xl font-bold text-purple-600 mb-2">
-                {scans.filter(s => s.timestamp > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()).length}
-              </div>
-              <div className="text-gray-600">Última Semana</div>
-            </div>
-          </div>
-
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Scan History */}
             <div className="lg:col-span-2">
               <div className="bg-white rounded-xl shadow-sm p-8 border border-gray-200">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Historial de Escaneos</h2>
-                
                 {scans.length === 0 ? (
                   <div className="text-center py-12">
                     <div className="w-16 h-16 bg-gray-100 rounded-full mx-auto mb-4 flex items-center justify-center">
@@ -159,45 +238,37 @@ const Profile = () => {
                               {scan.status === 'running' && 'En progreso'}
                               {scan.status === 'failed' && 'Fallido'}
                             </span>
-                            <span className="text-gray-500 text-sm">{scan.results.length} resultados</span>
+                            <span className="text-gray-500 text-sm">{scan.results?.length || 0} resultados</span>
                           </div>
                         </div>
-
                         {selectedScan?.id === scan.id && (
-                          <div className="mt-6 pt-6 border-t border-gray-200">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                              <div>
-                                <span className="text-gray-500 text-sm">Total</span>
-                                <p className="text-gray-900 font-medium">{scan.results.length}</p>
-                              </div>
-                              <div>
-                                <span className="text-gray-500 text-sm">Accesibles</span>
-                                <p className="text-green-600 font-medium">
-                                  {scan.results.filter(r => r.http_status === 200).length}
-                                </p>
-                              </div>
-                              <div>
-                                <span className="text-gray-500 text-sm">Redirecciones</span>
-                                <p className="text-yellow-600 font-medium">
-                                  {scan.results.filter(r => r.is_redirect).length}
-                                </p>
-                              </div>
-                              <div>
-                                <span className="text-gray-500 text-sm">Errores</span>
-                                <p className="text-red-600 font-medium">
-                                  {scan.results.filter(r => r.http_status >= 400).length}
-                                </p>
-                              </div>
-                            </div>
-
+                          <div className="mt-6 pt-6 border-t border-gray-200 flex gap-3">
                             <button
-                              onClick={(e) => {
+                              onClick={e => {
                                 e.stopPropagation();
-                                handleGenerateReport(scan);
+                                handleShowScanDetails(scan);
                               }}
                               className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300"
                             >
-                              Generar Reporte
+                              Ver Detalles
+                            </button>
+                            <button
+                              onClick={e => {
+                                e.stopPropagation();
+                                handleShowReport(scan);
+                              }}
+                              className="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300"
+                            >
+                              Ver Reporte
+                            </button>
+                            <button
+                              onClick={e => {
+                                e.stopPropagation();
+                                handleHideScan(scan.id);
+                              }}
+                              className="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300"
+                            >
+                              Eliminar
                             </button>
                           </div>
                         )}
@@ -207,30 +278,25 @@ const Profile = () => {
                 )}
               </div>
             </div>
-
             {/* User Info & Actions */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-xl shadow-sm p-8 border border-gray-200">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Información de Cuenta</h2>
-                
                 <div className="space-y-6">
                   <div>
                     <label className="text-gray-500 text-sm">Nombre</label>
                     <p className="text-gray-900">{user?.firstName ? `${user.firstName} ${user.lastName}` : user?.email}</p>
                   </div>
-                  
                   <div>
                     <label className="text-gray-500 text-sm">Email</label>
                     <p className="text-gray-900">{user?.email}</p>
                   </div>
-                  
                   <div>
                     <label className="text-gray-500 text-sm">Miembro desde</label>
                     <p className="text-gray-900">
                       {user?.creado_en ? new Date(user.creado_en).toLocaleDateString('es-ES', { year: 'numeric', month: 'long' }) : 'Desconocido'}
                     </p>
                   </div>
-
                   <div className="pt-6 border-t border-gray-200 space-y-3">
                     <button 
                       onClick={() => navigate('/scanner')}
@@ -238,21 +304,15 @@ const Profile = () => {
                     >
                       Nuevo Escaneo
                     </button>
-                    
                     <button 
                       className="w-full border-2 border-blue-600 text-blue-600 bg-white hover:bg-blue-600 hover:text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300"
                       onClick={() => setShowAccountSettings(true)}
                     >
                       Configurar Cuenta
                     </button>
-                    
-                    <button className="w-full text-gray-500 hover:text-gray-700 transition-colors py-2">
-                      Descargar Todos los Reportes
-                    </button>
                   </div>
                 </div>
               </div>
-
               {/* Recent Activity */}
               <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 mt-6">
                 <h3 className="text-xl font-bold text-gray-900 mb-4">Actividad Reciente</h3>
@@ -272,7 +332,6 @@ const Profile = () => {
                       }`}></span>
                     </div>
                   ))}
-                  
                   {scans.length === 0 && (
                     <p className="text-gray-500 text-sm">No hay actividad reciente</p>
                   )}
@@ -282,7 +341,46 @@ const Profile = () => {
           </div>
         </div>
       </div>
-
+      {/* Modal de detalles del escaneo */}
+      {showDetailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-8 relative animate-fadeInUp">
+            <button
+              onClick={() => setShowDetailModal(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl font-bold"
+              aria-label="Cerrar detalles"
+            >
+              ×
+            </button>
+            <h2 className="text-2xl font-bold mb-4 text-blue-700 flex items-center gap-2">
+              📄 Detalles del Escaneo
+            </h2>
+            <pre className="bg-gray-100 rounded-lg p-4 text-sm max-h-96 overflow-auto whitespace-pre-wrap">
+              {JSON.stringify(detailModalContent, null, 2)}
+            </pre>
+          </div>
+        </div>
+      )}
+      {/* Modal de reporte IA */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-8 relative animate-fadeInUp">
+            <button
+              onClick={() => setShowReportModal(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl font-bold"
+              aria-label="Cerrar reporte"
+            >
+              ×
+            </button>
+            <h2 className="text-2xl font-bold mb-4 text-green-700 flex items-center gap-2">
+              🧠 Reporte IA Generado
+            </h2>
+            <pre className="bg-gray-100 rounded-lg p-4 text-sm max-h-96 overflow-auto whitespace-pre-wrap">
+              {typeof reportModalContent === 'string' ? reportModalContent : JSON.stringify(reportModalContent, null, 2)}
+            </pre>
+          </div>
+        </div>
+      )}
       {showAccountSettings && (
         <AccountSettings onClose={() => setShowAccountSettings(false)} />
       )}

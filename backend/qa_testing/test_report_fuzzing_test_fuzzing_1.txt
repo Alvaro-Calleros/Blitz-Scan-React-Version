@@ -1,0 +1,51 @@
+REPORTE DE ESCANEO - BLITZ SCAN
+===========================================
+
+📋 INFORMACIÓN DEL ESCANEO:
+   • URL objetivo: https://example.com
+   • Tipo de escaneo: FUZZING
+   • Fecha: 2024-01-15T12:00:00Z
+   • Estado: completed
+   • ID del escaneo: test_fuzzing_1
+
+🔍 RESULTADOS DE FUZZING:
+📁 Ruta: /admin
+   🔢 Estado HTTP: 200
+   📏 Tamaño: 1024 bytes
+   ⏱️  Tiempo: 0.500s
+   🔄 Redirección: No
+   📋 Headers: Content-Type: text/html; Server: Apache/2.4.41
+📁 Ruta: /backup
+   🔢 Estado HTTP: 403
+   📏 Tamaño: 512 bytes
+   ⏱️  Tiempo: 0.300s
+   🔄 Redirección: No
+   📋 Headers: Content-Type: text/html; Server: Apache/2.4.41
+📁 Ruta: /login
+   🔢 Estado HTTP: 302
+   📏 Tamaño: 256 bytes
+   ⏱️  Tiempo: 0.200s
+   🔄 Redirección: Sí
+   📋 Headers: Content-Type: text/html; Location: /dashboard
+📊 RESUMEN DE FUZZING:
+   • Total de rutas encontradas: 3
+   • Rutas accesibles (200): 1
+   • Redirecciones (3xx): 1
+   • Errores 4xx: 1
+   • Errores 5xx: 0
+
+===========================================
+🔒 RECOMENDACIONES DE SEGURIDAD:
+   • Revisar rutas accesibles no autorizadas
+   • Verificar configuración de redirecciones
+   • Implementar controles de acceso apropiados
+   • Ocultar información sensible en headers
+   • Mantener servicios actualizados
+   • Configurar firewalls apropiadamente
+   • Monitorear logs de acceso regularmente
+   • Realizar auditorías de seguridad periódicas
+
+===========================================
+📄 Generado por BlitzScan
+🕐 Fecha: 2024-01-15 12:00:00
+🌐 Herramienta de Ciberseguridad Profesional

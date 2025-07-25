@@ -15,9 +15,28 @@ export interface Scan {
   scan_type: string;
   timestamp: string;
   results: ScanResult[];
+
   status: 'completed' | 'running' | 'failed';
   extraResult?: any; // Para resultados de WHOIS y Nmap
   rawHarvester?: string; // Para resultado raw de theHarvester
+
+  status: 'completed' | 'running' | 'failed' | 'completado' | 'en_proceso' | 'error';
+  extraResult?: any;
+  // Campos adicionales de la base de datos
+  scan_id?: string;
+  _id?: string;
+  tipo_escaneo?: string;
+  fecha?: string;
+  created_at?: string;
+  updated_at?: string;
+  estado?: string;
+  detalles?: {
+    results?: ScanResult[];
+    scan_type?: string;
+    timestamp?: string;
+    extraResult?: any;
+  };
+
 }
 
 export const generateScanId = (): string => {
@@ -54,87 +73,481 @@ export const simulateScan = async (url: string, scanType: string): Promise<ScanR
 export const getHistoryKey = (userEmail: string) =>
   `blitz_scan_history_${userEmail}`;
 
-// Guardar historial para usuario
-export const saveScanToStorage = (scan: Scan, userEmail: string): void => {
-  const key = getHistoryKey(userEmail);
-  const existingScans = getSavedScans(userEmail);
-  existingScans.unshift(scan);
-  if (existingScans.length > 50) existingScans.splice(50);
-  localStorage.setItem(key, JSON.stringify(existingScans));
-};
-
-// Leer historial para usuario
-export const getSavedScans = (userEmail: string): Scan[] => {
-  const key = getHistoryKey(userEmail);
-  const saved = localStorage.getItem(key);
-  return saved ? JSON.parse(saved) : [];
-};
-
-export const generatePDFReport = (scan: Scan): void => {
-  // In a real application, this would generate a proper PDF
-  // For now, we'll create a downloadable text report
-  
-  let resultsSection = '';
-  
-  if (scan.scan_type === 'fuzzing' && scan.results.length > 0) {
-    resultsSection = `Resultados Encontrados:
-${scan.results.map(result => `
-- Ruta: ${result.path_found}
-  Estado HTTP: ${result.http_status}
-  Tamaño: ${result.response_size} bytes
-  Tiempo de respuesta: ${result.response_time.toFixed(3)}s
-  Es redirección: ${result.is_redirect ? 'Sí' : 'No'}
-  Headers: ${result.headers}
-`).join('')}
-
-Resumen:
-- Total de rutas encontradas: ${scan.results.length}
-- Rutas accesibles (200): ${scan.results.filter(r => r.http_status === 200).length}
-- Redirecciones: ${scan.results.filter(r => r.is_redirect).length}
-- Errores 4xx: ${scan.results.filter(r => r.http_status >= 400 && r.http_status < 500).length}`;
-  } else if (scan.scan_type === 'nmap' || scan.scan_type === 'whois') {
-    const extraResult = scan.extraResult || 'No hay resultados disponibles';
-    resultsSection = `Resultados del Análisis:
-${extraResult}`;
+// --- GUARDAR ESCANEO WHOIS ---
+export const saveWhoisScan = async (scan: Scan, userId: number): Promise<any> => {
+  try {
+    const response = await fetch('http://localhost:3001/api/save-whois-scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: userId,
+        url: scan.url,
+        whoisData: scan.extraResult, // objeto JSON plano
+        estado: scan.status || 'completado'
+      })
+    });
+    const data = await response.json();
+    return data; // <-- retorna el objeto completo
+  } catch (error) {
+    console.error('Error guardando escaneo WHOIS:', error);
+    return { success: false };
   }
-  
-  const reportContent = `
-BLITZ SCAN - REPORTE DE SEGURIDAD
-================================
+};
 
-Información del Escaneo:
-- ID: ${scan.id}
-- URL: ${scan.url}
-- Tipo: ${scan.scan_type.toUpperCase()}
-- Fecha: ${new Date(scan.timestamp).toLocaleString('es-ES')}
-- Estado: ${scan.status}
+// --- GUARDAR ESCANEO NMAP ---
+export const saveNmapScan = async (scan: Scan, userId: number): Promise<any> => {
+  try {
+    const response = await fetch('http://localhost:3001/api/save-nmap-scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: userId,
+        url: scan.url,
+        nmapData: scan.extraResult, // objeto JSON plano
+        estado: scan.status || 'completado'
+      })
+    });
+    const data = await response.json();
+    return data; // <-- retorna el objeto completo
+  } catch (error) {
+    console.error('Error guardando escaneo NMAP:', error);
+    return { success: false };
+  }
+};
+
+// --- GUARDAR ESCANEO FUZZING ---
+export const saveFuzzingScan = async (scan: Scan, userId: number): Promise<any> => {
+  try {
+    const response = await fetch('http://localhost:3001/api/save-fuzzing-scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: userId,
+        url: scan.url,
+        fuzzingData: scan.results, // objeto JSON plano (array de resultados)
+        estado: scan.status || 'completado'
+      })
+    });
+    const data = await response.json();
+    return data; // <-- retorna el objeto completo
+  } catch (error) {
+    console.error('Error guardando escaneo FUZZING:', error);
+    return { success: false };
+  }
+};
+
+// --- CONSULTAR TODOS LOS ESCANEOS DEL USUARIO ---
+export const getAllScans = async (userId: number): Promise<any[]> => {
+  try {
+    const response = await fetch(`http://localhost:3001/api/get-scans/${userId}`);
+    const data = await response.json();
+    return data.scans || [];
+  } catch (error) {
+    console.error('Error obteniendo historial de escaneos:', error);
+    return [];
+  }
+};
+
+// --- CONSULTAR ESCANEO POR ID ---
+export const getScanById = async (scanId: number): Promise<any | null> => {
+  try {
+    const response = await fetch(`http://localhost:3001/api/get-scan/${scanId}`);
+    const data = await response.json();
+    return data.scan || null;
+  } catch (error) {
+    console.error('Error obteniendo escaneo por ID:', error);
+    return null;
+  }
+};
+
+// Función híbrida: intenta guardar en BD, si falla usa localStorage
+export const saveScan = async (scan: Scan, userId: number, userEmail: string): Promise<boolean> => {
+  try {
+    let extraResult = scan.extraResult;
+
+    // LOG de depuración
+    console.log('saveScan - original extraResult:', extraResult);
+
+    // Si es WHOIS y extraResult es un objeto, mándalo tal cual
+    if (scan.scan_type.toLowerCase() === 'whois' && typeof extraResult === 'object' && extraResult !== null) {
+      // Nada que hacer, ya es el objeto correcto
+    }
+    // Si es WHOIS y extraResult viene anidado en .resultado, usa ese objeto
+    else if (scan.scan_type.toLowerCase() === 'whois' && extraResult?.resultado && typeof extraResult.resultado === 'object') {
+      extraResult = extraResult.resultado;
+    }
+    // Si es WHOIS y extraResult es un string JSON, parsea
+    else if (scan.scan_type.toLowerCase() === 'whois' && typeof extraResult === 'string' && extraResult.includes('{')) {
+      try {
+        extraResult = JSON.parse(extraResult);
+      } catch (e) {
+        // Si falla, dejar el string
+      }
+    }
+    // Si es WHOIS y extraResult es un string embellecido, intentar parsear el JSON dentro del string
+    else if (scan.scan_type.toLowerCase() === 'whois' && typeof extraResult === 'string') {
+      const jsonStart = extraResult.indexOf('{');
+      if (jsonStart !== -1) {
+        try {
+          extraResult = JSON.parse(extraResult.substring(jsonStart));
+        } catch (e) {
+          // Si falla, dejar el string
+        }
+      }
+    }
+
+    // LOG de depuración
+    console.log('saveScan - FINAL extraResult que se enviará:', extraResult);
+
+    // Preparar los detalles para guardar
+    const detalles = {
+      results: scan.results || [],
+      scan_type: scan.scan_type,
+      timestamp: scan.timestamp,
+      extraResult: extraResult // <-- aquí va el objeto plano
+    };
+
+    const response = await fetch('http://localhost:3001/api/save-scan', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId: userId,
+        url: scan.url,
+        scanType: scan.scan_type,
+        results: [],
+        extraResult: detalles,
+        timestamp: scan.timestamp
+      }),
+    });
+
+    const data = await response.json();
+    if (data.success) {
+      console.log('Escaneo guardado en la base de datos:', data.message);
+      return true;
+    } else {
+      console.error('Error guardando escaneo:', data.message);
+      return false;
+    }
+  } catch (error) {
+    console.error('Error de conexión al guardar escaneo:', error);
+    return false;
+  }
+};
+
+// Elimina la función getScans y cualquier referencia a getScansFromDatabase o getSavedScans
+// Ya no se usa fallback a localStorage ni consulta general
+
+// Función para ocultar un escaneo (soft delete)
+export const hideScan = async (scanId: string, userId: number): Promise<boolean> => {
+  try {
+    const response = await fetch('http://localhost:3001/api/hide-scan', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        scanId: parseInt(scanId, 10),
+        userId: parseInt(String(userId), 10)
+      })
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      console.log('Escaneo ocultado exitosamente');
+      return true;
+    } else {
+      console.error('Error ocultando escaneo:', data.message);
+      return false;
+    }
+  } catch (error) {
+    console.error('Error en hideScan:', error);
+    return false;
+  }
+};
+
+// Función para ocultar múltiples escaneos (soft delete)
+export const hideMultipleScans = async (scanIds: string[], userId: number): Promise<boolean> => {
+  try {
+    const scanIdsInt = scanIds.map(id => parseInt(id, 10));
+    const response = await fetch('http://localhost:3001/api/hide-scans', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        scanIds: scanIdsInt,
+        userId: parseInt(String(userId), 10)
+      })
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      console.log('Escaneos ocultados exitosamente');
+      return true;
+    } else {
+      console.error('Error ocultando escaneos:', data.message);
+      return false;
+    }
+  } catch (error) {
+    console.error('Error en hideMultipleScans:', error);
+    return false;
+  }
+};
+
+// Función para formatear resultados según el tipo de escaneo
+const formatScanResults = (scan: Scan): string => {
+  switch (scan.scan_type.toLowerCase()) {
+    case 'whois':
+      try {
+        // Obtener los datos WHOIS
+        let whoisData = scan.extraResult;
+        
+        // Si los datos están en detalles.extraResult como string, intentar extraer el JSON
+        if (typeof whoisData === 'string') {
+          try {
+            whoisData = JSON.parse(whoisData);
+          } catch {
+            // Si no es JSON, asumimos que es texto formateado
+            return whoisData;
+          }
+        }
+        
+        // Si los datos están en la estructura de la base de datos
+        if (scan.extraResult?.detalles?.extraResult) {
+          whoisData = scan.extraResult.detalles.extraResult;
+        }
+
+        // Si no tenemos datos válidos, mostrar error
+        if (!whoisData) {
+          console.error('Datos WHOIS no encontrados:', scan);
+          return '❌ No se encontraron resultados de WHOIS';
+        }
+
+        // Formatear la salida
+        let output = '📋 RESULTADOS DE WHOIS\n\n';
+
+        // Información básica del dominio
+        output += '🌐 INFORMACIÓN DEL DOMINIO\n';
+        output += `   • Dominio: ${whoisData.domain_name || scan.url}\n`;
+        output += `   • Registrador: ${whoisData.registrar || 'No disponible'}\n`;
+        output += `   • Estado: Activo\n`;
+
+        // Fechas importantes
+        output += '\n📅 FECHAS\n';
+        output += `   • Creación: ${formatDate(whoisData.creation_date)}\n`;
+        output += `   • Expiración: ${formatDate(whoisData.expiration_date)}\n`;
+        output += `   • Actualización: ${formatDate(whoisData.updated_date)}\n`;
+
+        // Información del registrante
+        if (whoisData.registrant) {
+          output += '\n👤 REGISTRANTE\n';
+          output += `   • Nombre: ${whoisData.registrant.name || 'No disponible'}\n`;
+          if (whoisData.registrant.city && whoisData.registrant.city !== 'No disponible') {
+            output += `   • Ciudad: ${whoisData.registrant.city}\n`;
+          }
+          if (whoisData.registrant.state && whoisData.registrant.state !== 'No disponible') {
+            output += `   • Estado: ${whoisData.registrant.state}\n`;
+          }
+          if (whoisData.registrant.country && whoisData.registrant.country !== 'No disponible') {
+            output += `   • País: ${whoisData.registrant.country}\n`;
+          }
+        }
+
+        // Contacto administrativo
+        if (whoisData.admin_contact) {
+          output += '\n👔 CONTACTO ADMINISTRATIVO\n';
+          output += `   • Nombre: ${whoisData.admin_contact.name || 'No disponible'}\n`;
+          if (whoisData.admin_contact.city && whoisData.admin_contact.city !== 'No disponible') {
+            output += `   • Ciudad: ${whoisData.admin_contact.city}\n`;
+          }
+          if (whoisData.admin_contact.state && whoisData.admin_contact.state !== 'No disponible') {
+            output += `   • Estado: ${whoisData.admin_contact.state}\n`;
+          }
+          if (whoisData.admin_contact.country && whoisData.admin_contact.country !== 'No disponible') {
+            output += `   • País: ${whoisData.admin_contact.country}\n`;
+          }
+        }
+
+        // Contacto técnico
+        if (whoisData.tech_contact) {
+          output += '\n🔧 CONTACTO TÉCNICO\n';
+          output += `   • Nombre: ${whoisData.tech_contact.name || 'No disponible'}\n`;
+          if (whoisData.tech_contact.city && whoisData.tech_contact.city !== 'No disponible') {
+            output += `   • Ciudad: ${whoisData.tech_contact.city}\n`;
+          }
+          if (whoisData.tech_contact.state && whoisData.tech_contact.state !== 'No disponible') {
+            output += `   • Estado: ${whoisData.tech_contact.state}\n`;
+          }
+          if (whoisData.tech_contact.country && whoisData.tech_contact.country !== 'No disponible') {
+            output += `   • País: ${whoisData.tech_contact.country}\n`;
+          }
+        }
+
+        // Contacto de facturación
+        if (whoisData.billing_contact && whoisData.billing_contact.name !== 'No disponible') {
+          output += '\n💳 CONTACTO DE FACTURACIÓN\n';
+          output += `   • Nombre: ${whoisData.billing_contact.name}\n`;
+          if (whoisData.billing_contact.city && whoisData.billing_contact.city !== 'No disponible') {
+            output += `   • Ciudad: ${whoisData.billing_contact.city}\n`;
+          }
+          if (whoisData.billing_contact.state && whoisData.billing_contact.state !== 'No disponible') {
+            output += `   • Estado: ${whoisData.billing_contact.state}\n`;
+          }
+          if (whoisData.billing_contact.country && whoisData.billing_contact.country !== 'No disponible') {
+            output += `   • País: ${whoisData.billing_contact.country}\n`;
+          }
+        }
+
+        // Servidores DNS
+        if (whoisData.name_servers && whoisData.name_servers.length > 0) {
+          output += '\n🌍 SERVIDORES DNS\n';
+          whoisData.name_servers.forEach((server: string) => {
+            output += `   • ${server}\n`;
+          });
+        }
+
+        // Análisis y recomendaciones
+        output += '\n📊 ANÁLISIS Y RECOMENDACIONES\n';
+        
+        // Verificar estado del dominio
+        const expirationDate = new Date(whoisData.expiration_date);
+        const now = new Date();
+        const monthsUntilExpiration = Math.floor((expirationDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30));
+        
+        if (monthsUntilExpiration < 6) {
+          output += '   ⚠️ El dominio expirará en menos de 6 meses\n';
+          output += '   • Considera renovar el dominio pronto\n';
+        }
+
+        // Verificar información de contacto
+        const missingContacts = [];
+        if (!whoisData.admin_contact?.name || whoisData.admin_contact.name === 'No disponible') {
+          missingContacts.push('administrativo');
+        }
+        if (!whoisData.tech_contact?.name || whoisData.tech_contact.name === 'No disponible') {
+          missingContacts.push('técnico');
+        }
+        if (missingContacts.length > 0) {
+          output += `   ⚠️ Falta información de contacto ${missingContacts.join(' y ')}\n`;
+        }
+
+        output += '   • Verifica regularmente la información de contacto\n';
+        output += '   • Mantén actualizados los registros DNS\n';
+        output += '   • Configura renovación automática si es posible\n';
+        output += '   • Asegura que los contactos técnicos estén al día\n';
+
+        if (whoisData.name_servers && whoisData.name_servers.length < 2) {
+          output += '   ⚠️ Se recomienda tener al menos dos servidores DNS para redundancia\n';
+        }
+
+        return output;
+
+      } catch (error) {
+        console.error('Error procesando resultados WHOIS:', error);
+        if (typeof scan.extraResult?.detalles?.extraResult === 'string') {
+          // Si tenemos el texto formateado, usarlo como fallback
+          return scan.extraResult.detalles.extraResult;
+        }
+        return '❌ Error procesando los resultados de WHOIS';
+      }
+
+    case 'nmap':
+      if (scan.extraResult) {
+        // Si extraResult es un string, usarlo directamente
+        if (typeof scan.extraResult === 'string') {
+          return `🌐 RESULTADOS DE NMAP:\n${scan.extraResult}`;
+        }
+        // Si es un objeto, formatearlo
+        if (typeof scan.extraResult === 'object') {
+          try {
+            return `🌐 RESULTADOS DE NMAP:\n${JSON.stringify(scan.extraResult, null, 2)}`;
+          } catch {
+            return `🌐 RESULTADOS DE NMAP:\n${String(scan.extraResult)}`;
+          }
+        }
+      }
+      return '❌ No se encontraron resultados de Nmap';
+
+    case 'fuzzing':
+      if (scan.results && scan.results.length > 0) {
+        const results = scan.results.map(result => `
+📁 Ruta: ${result.path_found}
+   🔢 Estado HTTP: ${result.http_status}
+   📏 Tamaño: ${result.response_size} bytes
+   ⏱️  Tiempo: ${result.response_time.toFixed(3)}s
+   🔄 Redirección: ${result.is_redirect ? 'Sí' : 'No'}
+   📋 Headers: ${result.headers}
+`).join('');
+
+        const summary = `
+📊 RESUMEN DE FUZZING:
+   • Total de rutas encontradas: ${scan.results.length}
+   • Rutas accesibles (200): ${scan.results.filter(r => r.http_status === 200).length}
+   • Redirecciones (3xx): ${scan.results.filter(r => r.is_redirect).length}
+   • Errores 4xx: ${scan.results.filter(r => r.http_status >= 400 && r.http_status < 500).length}
+   • Errores 5xx: ${scan.results.filter(r => r.http_status >= 500).length}`;
+
+        return `🔍 RESULTADOS DE FUZZING:${results}${summary}`;
+      }
+      return '❌ No se encontraron resultados de fuzzing';
+
+    default:
+      return '❌ Tipo de escaneo no reconocido';
+  }
+};
+
+// Función mejorada para generar reportes
+export const generatePDFReport = (scan: Scan): void => {
+  console.log('Generando reporte para:', scan);
+  console.log('Tipo de escaneo:', scan.scan_type);
+  console.log('ExtraResult:', scan.extraResult);
+  console.log('Results:', scan.results);
+
+  const resultsSection = formatScanResults(scan);
+
+  const reportContent = `REPORTE DE ESCANEO - BLITZ SCAN
+===========================================
+
+📋 INFORMACIÓN DEL ESCANEO:
+   • URL objetivo: ${scan.url}
+   • Tipo de escaneo: ${scan.scan_type.toUpperCase()}
+   • Fecha: ${new Date(scan.timestamp).toLocaleString('es-ES')}
+   • Estado: ${scan.status}
+   • ID del escaneo: ${scan.id}
 
 ${resultsSection}
 
-Recomendaciones:
-1. Revisar rutas accesibles no autorizadas
-2. Verificar configuración de redirecciones
-3. Implementar controles de acceso apropiados
-4. Ocultar información sensible en headers
-5. Mantener servicios actualizados
-6. Configurar firewalls apropiadamente
-7. Monitorear logs de acceso regularmente
-8. Realizar auditorías de seguridad periódicas
+===========================================
+🔒 RECOMENDACIONES DE SEGURIDAD:
+   • Revisar rutas accesibles no autorizadas
+   • Verificar configuración de redirecciones
+   • Implementar controles de acceso apropiados
+   • Ocultar información sensible en headers
+   • Mantener servicios actualizados
+   • Configurar firewalls apropiadamente
+   • Monitorear logs de acceso regularmente
+   • Realizar auditorías de seguridad periódicas
 
----
-Generado por BLITZ SCAN - Herramienta de Ciberseguridad
-  `.trim();
+===========================================
+📄 Generado por BlitzScan
+🕐 Fecha: ${new Date().toLocaleString('es-ES')}
+🌐 Herramienta de Ciberseguridad Profesional
+`;
 
-  // Create and download the report
-  const blob = new Blob([reportContent], { type: 'text/plain' });
+  // Crear y descargar el archivo
+  const blob = new Blob([reportContent], { type: 'text/plain; charset=utf-8' });
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `blitz-scan-report-${scan.id}.txt`;
+  a.download = `blitzscan_report_${scan.scan_type}_${new Date().getTime()}.txt`;
   document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
   window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
 };
 
 // URL base del backend
@@ -245,106 +658,22 @@ export const scanNmap = async (url: string): Promise<any> => {
 
 export const scanWhois = async (url: string): Promise<any> => {
   const domain = extractDomain(url);
-  
-  // Función de reintento
-  const attemptWhois = async (retryCount: number = 0): Promise<any> => {
-    try {
       const res = await fetch(`${API_BASE}/whois`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ objetivo: domain })
       });
-      
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-      }
-      
       const data = await res.json();
-      console.log('WHOIS Backend Response:', data);
-      console.log('WHOIS Raw Result:', data.resultado);
-      console.log('WHOIS Raw Result Type:', typeof data.resultado);
-      console.log('WHOIS Raw Result Length:', data.resultado?.length || 0);
 
-      let rawResult = data.resultado || 'Error al obtener información WHOIS';
-      let whoisData: any = null;
+  // Si ya es un objeto, simplemente devuélvelo
+  if (typeof data.resultado === 'object') {
+    return data.resultado;
+  }
 
-      // 1. Intentar extraer JSON si existe
-      try {
-        const jsonStart = rawResult.indexOf('{');
-        if (jsonStart !== -1) {
-          const jsonPart = rawResult.substring(jsonStart);
-          console.log('WHOIS JSON Part:', jsonPart);
-          whoisData = JSON.parse(jsonPart);
-          console.log('WHOIS Parsed JSON:', whoisData);
-        } else {
-          console.log('WHOIS No JSON found in response');
-        }
-      } catch (error) {
-        console.log('WHOIS JSON Parse Error:', error);
-      }
-
-      // 2. Si no es JSON, intentar extraer datos clave del texto plano
-      if (!whoisData) {
-        console.log('WHOIS Using Text Parser');
-        console.log('WHOIS Text to parse:', rawResult);
-        whoisData = parseWhoisTextToObject(rawResult, domain);
-        console.log('WHOIS Text Parser Result:', whoisData);
-      }
-
-      // 3. Verificar si tenemos datos útiles
-      const hasUsefulData = whoisData && (
-        whoisData.registrar !== 'No disponible' ||
-        whoisData.creation_date !== 'No disponible' ||
-        whoisData.expiration_date !== 'No disponible' ||
-        whoisData.registrant?.name !== 'No disponible' ||
-        (whoisData.name_servers && whoisData.name_servers.length > 0)
-      );
-
-      // Verificar también si el raw result contiene información útil
-      const rawHasUsefulData = rawResult && (
-        rawResult.toLowerCase().includes('registrar') ||
-        rawResult.toLowerCase().includes('creation') ||
-        rawResult.toLowerCase().includes('expiration') ||
-        rawResult.toLowerCase().includes('registrant') ||
-        rawResult.toLowerCase().includes('name server') ||
-        rawResult.toLowerCase().includes('nameserver')
-      );
-
-      if (!hasUsefulData && !rawHasUsefulData && retryCount < 3) {
-        console.log(`WHOIS attempt ${retryCount + 1} failed, retrying...`);
-        await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1))); // Esperar más tiempo entre reintentos
-        return attemptWhois(retryCount + 1);
-      }
-
-      // Si tenemos datos útiles o hemos agotado los reintentos, devolver el resultado
-      return whoisData;
-      
-    } catch (error) {
-      console.error('WHOIS Error:', error);
-      
-      if (retryCount < 3) {
-        console.log(`WHOIS attempt ${retryCount + 1} failed, retrying...`);
-        await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1)));
-        return attemptWhois(retryCount + 1);
-      }
-      
-      // Si todos los reintentos fallan, devolver datos por defecto
-      return {
-        domain_name: domain,
-        registrar: 'Error al obtener datos',
-        creation_date: 'No disponible',
-        expiration_date: 'No disponible',
-        updated_date: 'No disponible',
-        registrant: {
-          name: 'No disponible',
-          country: 'No disponible'
-        },
-        name_servers: []
-      };
-    }
-  };
-
-  return await attemptWhois();
+  // Si es un string, sigue con el procesamiento anterior
+  const whoisRaw = data.resultado || 'Error al obtener información WHOIS';
+  // ... aquí tu lógica de parseo de string si lo necesitas ...
+  return whoisRaw;
 };
 
 export const scanSubfinder = async (url: string): Promise<string> => {
@@ -621,7 +950,7 @@ function getCategoryIcon(category: string): string {
     'File Transfer': '📁',
     'Database': '🗄️',
     'Mail Services': '📧',
-    'Network Services': '🌍',
+    'Network Services': '🌐',
     'Other': '⚙️'
   };
   return icons[category] || '⚙️';
@@ -639,3 +968,15 @@ function getRiskLevel(service: string, port: string): string {
   }
   return '🟢 BAJO';
 }
+
+// Función auxiliar para formatear fechas
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return 'No disponible';
+  try {
+    const date = new Date(dateStr);
+    return date.toISOString().split('T')[0];
+  } catch {
+    return dateStr;
+  }
+}
+
