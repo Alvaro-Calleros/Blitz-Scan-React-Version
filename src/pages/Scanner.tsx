@@ -7,20 +7,21 @@ import WhoisResult from '../components/WhoisResult';
 import NmapResult from '../components/NmapResult';
 import FuzzingResult from '../components/FuzzingResult';
 
-import { simulateScan, saveScanToStorage, generatePDFReport, generateScanId, Scan, ScanResult, scanFuzzing, scanNmap, scanWhois, scanSubfinder, scanWhatweb, scanParamspider, scanTheharvester } from '../utils/scanUtils';
-
-import { simulateScan, saveScan, generatePDFReport, generateScanId, Scan, ScanResult, scanFuzzing, scanNmap, scanWhois, saveWhoisScan, saveNmapScan, saveFuzzingScan } from '../utils/scanUtils';
-
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/table';
 import { ChartContainer } from '../components/ui/chart';
 import * as RechartsPrimitive from 'recharts';
 import ChatbotModal from '../components/ChatbotModal';
+import { generatePDFReport, generateScanId, Scan, ScanResult, scanFuzzing, scanNmap, scanWhois, saveWhoisScan, saveNmapScan, saveFuzzingScan } from '../utils/scanUtils';
+
+// Extender Scan para incluir rawHarvester opcional si no está en la interfaz global
+// (esto es solo para TypeScript, no afecta la lógica)
+type ScanWithHarvester = Scan & { rawHarvester?: string };
 
 const Scanner = () => {
   const [url, setUrl] = useState('');
   const [scanType, setScanType] = useState('fuzzing');
   const [isScanning, setIsScanning] = useState(false);
-  const [currentScan, setCurrentScan] = useState<Scan | null>(null);
+  const [currentScan, setCurrentScan] = useState<ScanWithHarvester | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -110,21 +111,17 @@ const Scanner = () => {
       toast.error('Por favor, introduce una URL válida');
       return;
     }
-
-    // Basic URL validation
     try {
       new URL(url);
     } catch {
       toast.error('URL no válida. Asegúrate de incluir http:// o https://');
       return;
     }
-
     setIsScanning(true);
-    setScanSaved(false); // Reset al iniciar nuevo escaneo
-    setSaveScanClicked(false); // Reset al iniciar nuevo escaneo
+    setScanSaved(false);
+    setSaveScanClicked(false);
     const scanId = generateScanId();
-    
-    const newScan: Scan = {
+    const newScan: ScanWithHarvester = {
       id: scanId,
       url,
       scan_type: scanType,
@@ -132,56 +129,18 @@ const Scanner = () => {
       results: [],
       status: 'running'
     };
-
     setCurrentScan(newScan);
     toast.info('Iniciando escaneo...', { duration: 1500 });
-
     try {
       let results: ScanResult[] = [];
       let extraResult: any = null;
-      
-      // Usar las funciones reales según el tipo de escaneo
       if (scanType === 'fuzzing') {
         results = await scanFuzzing(url);
       } else if (scanType === 'nmap') {
         extraResult = await scanNmap(url);
       } else if (scanType === 'whois') {
-        // WHOIS: obtener el objeto JSON plano del backend
-        const res = await fetch('http://localhost:5000/whois', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ objetivo: url })
-        });
-        const data = await res.json();
-        let whoisObject = null;
-        if (data.resultado && typeof data.resultado === 'string') {
-          const jsonStart = data.resultado.indexOf('{');
-          if (jsonStart !== -1) {
-            try {
-              whoisObject = JSON.parse(data.resultado.substring(jsonStart));
-            } catch (e) {
-              whoisObject = data.resultado; // fallback: usar el string si falla el parseo
-            }
-          } else {
-            whoisObject = data.resultado;
-          }
-        } else {
-          whoisObject = data.resultado;
-        }
-        extraResult = whoisObject;
+        extraResult = await scanWhois(url);
       } else if (scanType === 'subfinder') {
-
-        extraResult = await scanSubfinder(url);
-      } else if (scanType === 'whatweb') {
-        extraResult = await scanWhatweb(url);
-      } else if (scanType === 'paramspider') {
-        extraResult = await scanParamspider(url);
-      } else if (scanType === 'theharvester') {
-        const harv = await scanTheharvester(url);
-        extraResult = harv.beautified;
-        newScan.rawHarvester = harv.raw;
-
-        // Subfinder: nuevo escaneo
         const res = await fetch('http://localhost:5000/subfinder', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -189,30 +148,46 @@ const Scanner = () => {
         });
         const data = await res.json();
         extraResult = data.resultado;
-      } else {
-        // Fallback a simulación
-        results = await simulateScan(url, scanType);
-
+      } else if (scanType === 'paramspider') {
+        const res = await fetch('http://localhost:5000/paramspider', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ objetivo: url })
+        });
+        const data = await res.json();
+        extraResult = data.resultado;
+      } else if (scanType === 'whatweb') {
+        const res = await fetch('http://localhost:5000/whatweb', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ objetivo: url })
+        });
+        const data = await res.json();
+        extraResult = data.resultado;
+      } else if (scanType === 'theharvester') {
+        const res = await fetch('http://localhost:5000/theharvester', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ objetivo: url })
+        });
+        const data = await res.json();
+        extraResult = data.resultado;
       }
-      
-      const completedScan: Scan = {
+      const completedScan: ScanWithHarvester = {
         ...newScan,
         results,
         extraResult,
         status: 'completed'
       };
-
       setCurrentScan(completedScan);
       setIsScanning(false);
       toast.success('¡Escaneo completado con éxito!', { duration: 2000 });
-      
     } catch (error) {
       console.error('Scan error:', error);
-      const failedScan: Scan = {
+      const failedScan: ScanWithHarvester = {
         ...newScan,
         status: 'failed'
       };
-      
       setCurrentScan(failedScan);
       setIsScanning(false);
       toast.error('Error durante el escaneo');
@@ -302,24 +277,6 @@ const Scanner = () => {
     }
   };
 
-  // Simular datos de estadísticas
-  const simulatedStats = {
-    yourScore: Math.floor(Math.random() * 100),
-    averageScore: 65,
-    sites: [
-      { name: 'Tu sitio', score: Math.floor(Math.random() * 100) },
-      { name: 'Sitio A', score: 80 },
-      { name: 'Sitio B', score: 60 },
-      { name: 'Sitio C', score: 40 },
-    ],
-    breakdown: [
-      { type: 'Fuzzing', value: Math.floor(Math.random() * 100) },
-      { type: 'Nmap', value: Math.floor(Math.random() * 100) },
-      { type: 'WHOIS', value: Math.floor(Math.random() * 100) },
-      { type: 'Subfinder', value: Math.floor(Math.random() * 100) },
-    ]
-  };
-
   // Nuevo: función para enviar mensaje libre a Ollama
   const handleChatbotSend = async () => {
     if (!chatInput.trim() || chatbotLoading) return;
@@ -377,6 +334,24 @@ const Scanner = () => {
     } catch (error) {
       toast.error('Error de conexión al guardar el reporte');
     }
+  };
+
+  // Simular datos de estadísticas
+  const simulatedStats = {
+    yourScore: Math.floor(Math.random() * 100),
+    averageScore: 65,
+    sites: [
+      { name: 'Tu sitio', score: Math.floor(Math.random() * 100) },
+      { name: 'Sitio A', score: 80 },
+      { name: 'Sitio B', score: 60 },
+      { name: 'Sitio C', score: 40 },
+    ],
+    breakdown: [
+      { type: 'Fuzzing', value: Math.floor(Math.random() * 100) },
+      { type: 'Nmap', value: Math.floor(Math.random() * 100) },
+      { type: 'WHOIS', value: Math.floor(Math.random() * 100) },
+      { type: 'Subfinder', value: Math.floor(Math.random() * 100) },
+    ]
   };
 
   return (
