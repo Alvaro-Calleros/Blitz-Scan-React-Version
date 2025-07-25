@@ -6,7 +6,11 @@ import Navbar from '../components/Navbar';
 import WhoisResult from '../components/WhoisResult';
 import NmapResult from '../components/NmapResult';
 import FuzzingResult from '../components/FuzzingResult';
+
+import { simulateScan, saveScanToStorage, generatePDFReport, generateScanId, Scan, ScanResult, scanFuzzing, scanNmap, scanWhois, scanSubfinder, scanWhatweb, scanParamspider, scanTheharvester } from '../utils/scanUtils';
+
 import { simulateScan, saveScan, generatePDFReport, generateScanId, Scan, ScanResult, scanFuzzing, scanNmap, scanWhois, saveWhoisScan, saveNmapScan, saveFuzzingScan } from '../utils/scanUtils';
+
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/table';
 import { ChartContainer } from '../components/ui/chart';
 import * as RechartsPrimitive from 'recharts';
@@ -40,6 +44,7 @@ const Scanner = () => {
       types: [
         { id: 'fuzzing', name: 'Fuzzing', description: 'Búsqueda de directorios y archivos ocultos' },
         { id: 'subfinder', name: 'Subfinder', description: 'Enumeración de subdominios' },
+        { id: 'paramspider', name: 'ParamSpider', description: 'Extracción de parámetros vulnerables' },
       ]
     },
     {
@@ -52,6 +57,8 @@ const Scanner = () => {
       category: 'Información',
       types: [
         { id: 'whois', name: 'WHOIS Lookup', description: 'Información del dominio y registrante' },
+        { id: 'theharvester', name: 'theHarvester', description: 'Recolección de correos y hosts públicos' },
+        { id: 'whatweb', name: 'WhatWeb', description: 'Fingerprinting de tecnologías web' },
       ]
     }
   ];
@@ -163,6 +170,17 @@ const Scanner = () => {
         }
         extraResult = whoisObject;
       } else if (scanType === 'subfinder') {
+
+        extraResult = await scanSubfinder(url);
+      } else if (scanType === 'whatweb') {
+        extraResult = await scanWhatweb(url);
+      } else if (scanType === 'paramspider') {
+        extraResult = await scanParamspider(url);
+      } else if (scanType === 'theharvester') {
+        const harv = await scanTheharvester(url);
+        extraResult = harv.beautified;
+        newScan.rawHarvester = harv.raw;
+
         // Subfinder: nuevo escaneo
         const res = await fetch('http://localhost:5000/subfinder', {
           method: 'POST',
@@ -174,6 +192,7 @@ const Scanner = () => {
       } else {
         // Fallback a simulación
         results = await simulateScan(url, scanType);
+
       }
       
       const completedScan: Scan = {
@@ -531,6 +550,149 @@ const Scanner = () => {
                           </div>
                         </div>
                       )}
+                      {scanType === 'whatweb' && currentScan.extraResult && (
+                        typeof currentScan.extraResult === 'string' ? (
+                          <div className="glass-card modern-shadow p-8 bg-gradient-to-br from-green-200 via-blue-100 to-blue-200 animate-fadeInUp rounded-3xl">
+                            <div className="flex items-center space-x-4 mb-6">
+                              <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-blue-400 rounded-3xl flex items-center justify-center shadow-xl">
+                                <span className="text-white text-4xl">🕵️‍♂️</span>
+                              </div>
+                              <div>
+                                <h3 className="text-3xl font-bold bg-gradient-to-r from-green-700 to-blue-700 bg-clip-text text-transparent">WhatWeb Resultados</h3>
+                                <p className="text-blue-900 text-base mt-1">Fingerprinting de tecnologías web</p>
+                              </div>
+                            </div>
+                            <pre className="bg-gradient-to-br from-green-100 to-blue-100 rounded-xl p-4 text-blue-900 whitespace-pre-wrap text-sm shadow-inner font-mono">{currentScan.extraResult}</pre>
+                          </div>
+                        ) : (
+                          <div className="glass-card modern-shadow p-8 bg-gradient-to-br from-green-200 via-blue-100 to-blue-200 animate-fadeInUp rounded-3xl">
+                            <div className="flex items-center space-x-4 mb-6">
+                              <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-blue-400 rounded-3xl flex items-center justify-center shadow-xl">
+                                <span className="text-white text-4xl">🕵️‍♂️</span>
+                              </div>
+                              <div>
+                                <h3 className="text-3xl font-bold bg-gradient-to-r from-green-700 to-blue-700 bg-clip-text text-transparent">WhatWeb Resultados</h3>
+                                <p className="text-blue-900 text-base mt-1">Fingerprinting de tecnologías web</p>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              {Object.entries(currentScan.extraResult).map(([cat, techs]) => (
+                                Array.isArray(techs) && techs.length > 0 && (
+                                  <div key={cat} className="bg-gradient-to-br from-white to-blue-50 rounded-2xl shadow p-4">
+                                    <div className="flex items-center mb-2">
+                                      <span className="text-2xl mr-2">{getWhatwebCategoryIcon(cat)}</span>
+                                      <span className="font-bold text-lg text-blue-800">{cat}</span>
+                                    </div>
+                                    <ul className="space-y-1">
+                                      {techs.map((t, idx) => (
+                                        <li key={idx} className="flex items-center space-x-2">
+                                          <span className="font-semibold text-gray-900">{t.name}</span>
+                                          {t.version && <span className="text-xs text-gray-500">v{t.version}</span>}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      )}
+                      {scanType === 'paramspider' && currentScan.extraResult && (
+                        <div className="glass-card modern-shadow p-8 bg-gradient-to-br from-violet-100 via-violet-200 to-fuchsia-100 animate-fadeInUp rounded-3xl">
+                          <div className="flex items-center space-x-4 mb-6">
+                            <div className="w-20 h-20 bg-gradient-to-br from-fuchsia-400 to-violet-500 rounded-3xl flex items-center justify-center shadow-xl">
+                              <span className="text-white text-4xl">🕷️</span>
+                            </div>
+                            <div>
+                              <h3 className="text-3xl font-bold bg-gradient-to-r from-fuchsia-700 to-violet-700 bg-clip-text text-transparent">Parámetros Encontrados</h3>
+                              <p className="text-violet-900 text-base mt-1">Extracción de parámetros vulnerables</p>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-3 max-h-96 overflow-y-auto">
+                            {currentScan.extraResult.split('\n').filter(l => l.startsWith('✅')).map((l, idx) => (
+                              <span key={idx} className="inline-flex items-center px-4 py-2 rounded-2xl bg-gradient-to-br from-violet-200 to-fuchsia-100 shadow font-mono text-base text-violet-900 border border-violet-200">
+                                <span className="text-fuchsia-600 mr-2">🔗</span>
+                                <span className="break-all">{l.replace('✅', '').trim()}</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {scanType === 'theharvester' && currentScan.extraResult && (
+                        <div className="glass-card modern-shadow p-8 bg-gradient-to-br from-blue-100 via-blue-200 to-cyan-100 animate-fadeInUp rounded-3xl">
+                          <div className="flex items-center space-x-4 mb-6">
+                            <div className="w-20 h-20 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-3xl flex items-center justify-center shadow-xl">
+                              <span className="text-white text-4xl">🔎</span>
+                            </div>
+                            <div>
+                              <h3 className="text-3xl font-bold bg-gradient-to-r from-blue-700 to-cyan-700 bg-clip-text text-transparent">theHarvester Resultados</h3>
+                              <p className="text-cyan-900 text-base mt-1">Recolección de correos, hosts y fuentes</p>
+                            </div>
+                          </div>
+                          <div className="space-y-6">
+                            {/* Correos */}
+                            <div>
+                              <div className="font-bold text-cyan-700 mb-2 flex items-center"><span className="mr-2 text-2xl">✉️</span>Correos encontrados:</div>
+                              {currentScan.extraResult.includes('📧') ? (
+                                <ul className="space-y-1">
+                                  {currentScan.extraResult.split('\n').filter(l => l.startsWith('✅') || l.startsWith('📧')).map((l, idx) => (
+                                    l.startsWith('📧') ? null : (
+                                      <li key={idx} className="flex items-center space-x-2">
+                                        <span className="text-cyan-600">✉️</span>
+                                        <span className="text-sm font-mono text-cyan-900 break-all">{l.replace('✅', '').trim()}</span>
+                                      </li>
+                                    )
+                                  ))}
+                                </ul>
+                              ) : (
+                                <div className="text-cyan-500 italic">No se encontraron correos.</div>
+                              )}
+                            </div>
+                            {/* Hosts/IPs */}
+                            <div>
+                              <div className="font-bold text-cyan-700 mb-2 flex items-center"><span className="mr-2 text-2xl">🌐</span>Hosts/IPs encontrados:</div>
+                              {currentScan.extraResult.includes('🌐') ? (
+                                <ul className="space-y-1">
+                                  {currentScan.extraResult.split('\n').filter(l => l.startsWith('🌐')).map((l, idx) => (
+                                    <li key={idx} className="flex items-center space-x-2">
+                                      <span className="text-cyan-600">🌐</span>
+                                      <span className="text-sm font-mono text-cyan-900 break-all">{l.replace('🌐', '').trim()}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <div className="text-cyan-500 italic">No se encontraron hosts/IPs.</div>
+                              )}
+                            </div>
+                            {/* Fuentes */}
+                            <div>
+                              <div className="font-bold text-cyan-700 mb-2 flex items-center"><span className="mr-2 text-2xl">🔗</span>Fuentes utilizadas:</div>
+                              {currentScan.extraResult.includes('🔎 Fuentes') ? (
+                                <ul className="space-y-1">
+                                  {currentScan.extraResult.split('\n').filter(l => l.startsWith('-')).map((l, idx) => (
+                                    <li key={idx} className="flex items-center space-x-2">
+                                      <span className="text-cyan-600">🔗</span>
+                                      <span className="text-sm font-mono text-cyan-900 break-all">{l.replace('-', '').trim()}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <div className="text-cyan-500 italic">No se encontraron fuentes.</div>
+                              )}
+                            </div>
+                            {/* RAW OUTPUT siempre disponible */}
+                            {currentScan.rawHarvester && (
+                              <details className="mt-6">
+                                <summary className="cursor-pointer font-semibold text-cyan-700">Ver salida completa de theHarvester (RAW)</summary>
+                                <pre className="bg-cyan-50 rounded-xl p-4 text-cyan-900 whitespace-pre-wrap text-xs shadow-inner mt-2 max-h-96 overflow-auto">
+                                  {currentScan.rawHarvester}
+                                </pre>
+                              </details>
+                            )}
+                          </div>
+                        </div>
+                      )}
                       
                       {/* Mostrar mensaje si no hay resultados */}
                       {currentScan.results.length === 0 && !currentScan.extraResult && (
@@ -652,3 +814,16 @@ const Scanner = () => {
 };
 
 export default Scanner;
+
+function getWhatwebCategoryIcon(cat) {
+  switch (cat) {
+    case 'CMS': return '📰';
+    case 'Web Server': return '🌐';
+    case 'Programming Language': return '💻';
+    case 'JS Framework': return '⚛️';
+    case 'Analytics': return '📊';
+    case 'Operating System': return '🖥️';
+    case 'CDN': return '🚀';
+    default: return '🔧';
+  }
+}
