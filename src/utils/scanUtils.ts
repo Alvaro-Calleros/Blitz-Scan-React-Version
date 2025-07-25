@@ -17,6 +17,7 @@ export interface Scan {
   results: ScanResult[];
   status: 'completed' | 'running' | 'failed';
   extraResult?: any; // Para resultados de WHOIS y Nmap
+  rawHarvester?: string; // Para resultado raw de theHarvester
 }
 
 export const generateScanId = (): string => {
@@ -355,6 +356,42 @@ export const scanSubfinder = async (url: string): Promise<string> => {
   });
   const data = await res.json();
   return data.resultado || 'No se encontraron subdominios.';
+};
+
+export const scanWhatweb = async (url: string): Promise<string> => {
+  const domain = extractDomain(url);
+  const res = await fetch(`${API_BASE}/whatweb`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ objetivo: domain })
+  });
+  const data = await res.json();
+  return data.resultado || 'No se obtuvo información de WhatWeb.';
+};
+
+export const scanParamspider = async (url: string): Promise<string> => {
+  const domain = extractDomain(url);
+  const res = await fetch(`${API_BASE}/paramspider`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ objetivo: domain })
+  });
+  const data = await res.json();
+  return data.resultado || 'No se encontraron parámetros.';
+};
+
+export const scanTheharvester = async (url: string): Promise<{ beautified: string, raw: string }> => {
+  const domain = extractDomain(url);
+  const res = await fetch('http://localhost:5000/theharvester', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ objetivo: domain })
+  });
+  const data = await res.json();
+  return {
+    beautified: data.resultado || '',
+    raw: data.raw || ''
+  };
 };
 
 // Función para extraer datos clave de un texto plano de WHOIS y devolver un objeto estructurado
