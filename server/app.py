@@ -443,7 +443,7 @@ def escanear_subfinder():
         return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
     try:
         resultado = subprocess.check_output([
-            r'C:\Users\alvar\go\bin\subfinder.exe',
+            'subfinder',
             '-d', objetivo,
             '-silent'
         ], text=True, stderr=subprocess.STDOUT)
@@ -454,78 +454,107 @@ def escanear_subfinder():
         return jsonify({'resultado': f'❌ Error inesperado:\n{str(e)}'}), 500
     return jsonify({'resultado': salida})
 
-# 🌐 Httpx
-@app.route('/httpx', methods=['POST'])
-def escanear_httpx():
-    objetivo = limpiar_objetivo(request.get_json().get('objetivo', ''))
-    if not objetivo:
-        return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
-    try:
-        # Se espera que el usuario pase una lista de dominios (uno por línea)
-        dominios = request.get_json().get('dominios', None)
-        if not dominios:
-            dominios = [objetivo]
-        if isinstance(dominios, str):
-            dominios = [dominios]
-        # Escribir dominios a un archivo temporal
-        import tempfile
-        with tempfile.NamedTemporaryFile(delete=False, mode='w', encoding='utf-8') as f:
-            for d in dominios:
-                f.write(d + '\n')
-            temp_path = f.name
-        resultado = subprocess.check_output([
-            r'C:\Users\santi\go\bin\httpx.exe',
-            '-l', temp_path,
-            '-silent'
-        ], text=True, stderr=subprocess.STDOUT)
-        os.unlink(temp_path)
-        salida = embellecer_httpx(resultado)
-    except subprocess.CalledProcessError as e:
-        return jsonify({'resultado': f'❌ Error en Httpx:\n{e.output}'}), 500
-    except Exception as e:
-        return jsonify({'resultado': f'❌ Error inesperado:\n{str(e)}'}), 500
-    return jsonify({'resultado': salida})
-
-# 🕵️‍♂️ WhatWeb
+# 🕵️‍♂️ WhatWeb (Python-based)
 @app.route('/whatweb', methods=['POST'])
 def escanear_whatweb():
     objetivo = limpiar_objetivo(request.get_json().get('objetivo', ''))
     if not objetivo:
         return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
     try:
-        resultado = subprocess.check_output([
-            r'C:\Ruby34-x64\bin\ruby.exe',
-            r'C:\Users\santi\WhatWeb\whatweb',
-            f'https://{objetivo}'
-        ], text=True, stderr=subprocess.STDOUT, cwd=r'C:\Users\santi\WhatWeb')
-        # Parsear la salida para extraer tecnologías y versiones
-        # Ejemplo: https://upsin.edu.mx [200 OK] Bootstrap[6.8.2], Frame, HTML5, HTTPServer[LiteSpeed], ...
+        import requests
+        from bs4 import BeautifulSoup
         import re
-        m = re.search(r'\[\d{3} [A-Z]+\] (.+)', resultado)
+        
+        url = f'https://{objetivo}'
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        html_content = response.text
+        soup = BeautifulSoup(html_content, 'html.parser')
+        
         techs = []
-        if m:
-            techs_raw = m.group(1)
-            for t in techs_raw.split(','):
-                t = t.strip()
-                if not t:
-                    continue
-                # Extraer nombre y versión si existe
-                name_ver = re.match(r'([\w\-\s]+)(\[(.*?)\])?', t)
-                if name_ver:
-                    name = name_ver.group(1).strip()
-                    version = name_ver.group(3) if name_ver.group(3) else ''
-                    techs.append({'name': name, 'version': version})
+        
+        # Detectar tecnologías basadas en headers
+        server = response.headers.get('Server', '')
+        if server:
+            techs.append({'name': server, 'version': ''})
+        
+        # Detectar tecnologías basadas en HTML
+        # WordPress
+        if 'wp-content' in html_content or 'wp-includes' in html_content:
+            techs.append({'name': 'WordPress', 'version': ''})
+        
+        # jQuery
+        jquery_match = re.search(r'jquery[.-](\d+\.\d+\.\d+)', html_content.lower())
+        if jquery_match:
+            techs.append({'name': 'jQuery', 'version': jquery_match.group(1)})
+        elif 'jquery' in html_content.lower():
+            techs.append({'name': 'jQuery', 'version': ''})
+        
+        # Bootstrap
+        bootstrap_match = re.search(r'bootstrap[.-](\d+\.\d+\.\d+)', html_content.lower())
+        if bootstrap_match:
+            techs.append({'name': 'Bootstrap', 'version': bootstrap_match.group(1)})
+        elif 'bootstrap' in html_content.lower():
+            techs.append({'name': 'Bootstrap', 'version': ''})
+        
+        # React
+        if 'react' in html_content.lower() or 'reactjs' in html_content.lower():
+            techs.append({'name': 'React', 'version': ''})
+        
+        # Angular
+        if 'ng-' in html_content or 'angular' in html_content.lower():
+            techs.append({'name': 'Angular', 'version': ''})
+        
+        # Vue.js
+        if 'vue' in html_content.lower():
+            techs.append({'name': 'Vue.js', 'version': ''})
+        
+        # PHP
+        if 'php' in html_content.lower() or '.php' in html_content:
+            techs.append({'name': 'PHP', 'version': ''})
+        
+        # Python/Django
+        if 'django' in html_content.lower() or 'csrfmiddlewaretoken' in html_content:
+            techs.append({'name': 'Django', 'version': ''})
+        
+        # Node.js/Express
+        if 'express' in html_content.lower():
+            techs.append({'name': 'Express.js', 'version': ''})
+        
+        # Google Analytics
+        if 'google-analytics' in html_content.lower() or 'gtag' in html_content.lower():
+            techs.append({'name': 'Google Analytics', 'version': ''})
+        
+        # Cloudflare
+        if 'cloudflare' in html_content.lower():
+            techs.append({'name': 'Cloudflare', 'version': ''})
+        
+        # Meta tags
+        meta_tags = soup.find_all('meta')
+        for tag in meta_tags:
+            name = tag.get('name', '').lower()
+            content = tag.get('content', '').lower()
+            
+            if 'generator' in name:
+                techs.append({'name': content.title(), 'version': ''})
+            elif 'framework' in name:
+                techs.append({'name': content.title(), 'version': ''})
+        
         # Agrupar por tipo básico usando keywords
         categories = {
             'CMS': ['WordPress', 'Drupal', 'Joomla'],
             'Web Server': ['Apache', 'Nginx', 'LiteSpeed', 'HTTPServer'],
-            'Programming Language': ['PHP', 'Python', 'Ruby', 'Perl'],
-            'JS Framework': ['jQuery', 'React', 'Angular', 'Vue'],
-            'Analytics': ['Google Analytics', 'Piwik', 'Hotjar'],
-            'Operating System': ['Ubuntu', 'Linux', 'Windows'],
+            'Programming Language': ['PHP', 'Python', 'Django'],
+            'JS Framework': ['jQuery', 'React', 'Angular', 'Vue.js', 'Express.js'],
+            'CSS Framework': ['Bootstrap'],
+            'Analytics': ['Google Analytics'],
             'CDN': ['Cloudflare'],
             'Other': []
         }
+        
         techs_by_cat = {k: [] for k in categories}
         for tech in techs:
             found = False
@@ -536,9 +565,11 @@ def escanear_whatweb():
                     break
             if not found:
                 techs_by_cat['Other'].append(tech)
+        
         return jsonify({'resultado': techs_by_cat})
-    except subprocess.CalledProcessError as e:
-        return jsonify({'resultado': f'❌ Error en WhatWeb:\n{e.output}'}), 500
+        
+    except requests.exceptions.RequestException as e:
+        return jsonify({'resultado': f'❌ Error de conexión:\n{str(e)}'}), 500
     except Exception as e:
         return jsonify({'resultado': f'❌ Error inesperado:\n{str(e)}'}), 500
 
@@ -550,10 +581,10 @@ def escanear_paramspider():
         return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
     try:
         resultado = subprocess.check_output([
-            'py', '-m', 'paramspider.main', '--domain', objetivo
-        ], text=True, stderr=subprocess.STDOUT, cwd=r'C:\Users\santi\ParamSpider')
+            'python', '-m', 'paramspider.main', '--domain', objetivo
+        ], text=True, stderr=subprocess.STDOUT, cwd=r'C:\Users\alvar\Desktop\BLITZ_SCAN\Blitz-Scan-React-Version\ParamSpider')
         # Buscar el archivo de resultados generado
-        results_dir = os.path.join(r'C:\Users\santi\ParamSpider', 'results')
+        results_dir = os.path.join(r'C:\Users\alvar\Desktop\BLITZ_SCAN\Blitz-Scan-React-Version\ParamSpider', 'results')
         pattern = os.path.join(results_dir, f'{objetivo}*.txt')
         files = glob.glob(pattern)
         if files:
@@ -578,8 +609,8 @@ def escanear_theharvester():
         return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
     try:
         resultado = subprocess.check_output([
-            'py', 'theHarvester.py', '-d', objetivo, '-b', 'all'
-        ], text=True, stderr=subprocess.STDOUT, cwd=r'C:\Users\santi\theHarvester')
+            'python', 'theHarvester.py', '-d', objetivo, '-b', 'all'
+        ], text=True, stderr=subprocess.STDOUT, cwd=r'C:\Users\alvar\Desktop\BLITZ_SCAN\Blitz-Scan-React-Version\theHarvester')
         # Parser robusto por bloques
         correos = []
         hosts = []
