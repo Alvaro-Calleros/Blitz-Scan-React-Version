@@ -6,17 +6,22 @@ import Navbar from '../components/Navbar';
 import WhoisResult from '../components/WhoisResult';
 import NmapResult from '../components/NmapResult';
 import FuzzingResult from '../components/FuzzingResult';
-import { simulateScan, saveScan, generatePDFReport, generateScanId, Scan, ScanResult, scanFuzzing, scanNmap, scanWhois, saveWhoisScan, saveNmapScan, saveFuzzingScan } from '../utils/scanUtils';
+
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/table';
 import { ChartContainer } from '../components/ui/chart';
 import * as RechartsPrimitive from 'recharts';
 import ChatbotModal from '../components/ChatbotModal';
+import { generatePDFReport, generateScanId, Scan, ScanResult, scanFuzzing, scanNmap, scanWhois, saveWhoisScan, saveNmapScan, saveFuzzingScan } from '../utils/scanUtils';
+
+// Extender Scan para incluir rawHarvester opcional si no está en la interfaz global
+// (esto es solo para TypeScript, no afecta la lógica)
+type ScanWithHarvester = Scan & { rawHarvester?: string };
 
 const Scanner = () => {
   const [url, setUrl] = useState('');
   const [scanType, setScanType] = useState('fuzzing');
   const [isScanning, setIsScanning] = useState(false);
-  const [currentScan, setCurrentScan] = useState<Scan | null>(null);
+  const [currentScan, setCurrentScan] = useState<ScanWithHarvester | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -40,6 +45,7 @@ const Scanner = () => {
       types: [
         { id: 'fuzzing', name: 'Fuzzing', description: 'Búsqueda de directorios y archivos ocultos' },
         { id: 'subfinder', name: 'Subfinder', description: 'Enumeración de subdominios' },
+        { id: 'paramspider', name: 'ParamSpider', description: 'Extracción de parámetros vulnerables' },
       ]
     },
     {
@@ -52,6 +58,8 @@ const Scanner = () => {
       category: 'Información',
       types: [
         { id: 'whois', name: 'WHOIS Lookup', description: 'Información del dominio y registrante' },
+        { id: 'theharvester', name: 'theHarvester', description: 'Recolección de correos y hosts públicos' },
+        { id: 'whatweb', name: 'WhatWeb', description: 'Fingerprinting de tecnologías web' },
       ]
     }
   ];
@@ -103,19 +111,17 @@ const Scanner = () => {
       toast.error('Por favor, introduce una URL válida');
       return;
     }
-
-    // Basic URL validation
     try {
       new URL(url);
     } catch {
       toast.error('URL no válida. Asegúrate de incluir http:// o https://');
       return;
     }
-
     setIsScanning(true);
+    setScanSaved(false);
+    setSaveScanClicked(false);
     const scanId = generateScanId();
-    
-    const newScan: Scan = {
+    const newScan: ScanWithHarvester = {
       id: scanId,
       url,
       scan_type: scanType,
@@ -123,45 +129,18 @@ const Scanner = () => {
       results: [],
       status: 'running'
     };
-
     setCurrentScan(newScan);
     toast.info('Iniciando escaneo...', { duration: 1500 });
-
     try {
       let results: ScanResult[] = [];
       let extraResult: any = null;
-      
-      // Usar las funciones reales según el tipo de escaneo
       if (scanType === 'fuzzing') {
         results = await scanFuzzing(url);
       } else if (scanType === 'nmap') {
         extraResult = await scanNmap(url);
       } else if (scanType === 'whois') {
-        // WHOIS: obtener el objeto JSON plano del backend
-        const res = await fetch('http://localhost:5000/whois', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ objetivo: url })
-        });
-        const data = await res.json();
-        let whoisObject = null;
-        if (data.resultado && typeof data.resultado === 'string') {
-          const jsonStart = data.resultado.indexOf('{');
-          if (jsonStart !== -1) {
-            try {
-              whoisObject = JSON.parse(data.resultado.substring(jsonStart));
-            } catch (e) {
-              whoisObject = data.resultado; // fallback: usar el string si falla el parseo
-            }
-          } else {
-            whoisObject = data.resultado;
-          }
-        } else {
-          whoisObject = data.resultado;
-        }
-        extraResult = whoisObject;
+        extraResult = await scanWhois(url);
       } else if (scanType === 'subfinder') {
-        // Subfinder: nuevo escaneo
         const res = await fetch('http://localhost:5000/subfinder', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -169,29 +148,46 @@ const Scanner = () => {
         });
         const data = await res.json();
         extraResult = data.resultado;
-      } else {
-        // Fallback a simulación
-        results = await simulateScan(url, scanType);
+      } else if (scanType === 'paramspider') {
+        const res = await fetch('http://localhost:5000/paramspider', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ objetivo: url })
+        });
+        const data = await res.json();
+        extraResult = data.resultado;
+      } else if (scanType === 'whatweb') {
+        const res = await fetch('http://localhost:5000/whatweb', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ objetivo: url })
+        });
+        const data = await res.json();
+        extraResult = data.resultado;
+      } else if (scanType === 'theharvester') {
+        const res = await fetch('http://localhost:5000/theharvester', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ objetivo: url })
+        });
+        const data = await res.json();
+        extraResult = data.resultado;
       }
-      
-      const completedScan: Scan = {
+      const completedScan: ScanWithHarvester = {
         ...newScan,
         results,
         extraResult,
         status: 'completed'
       };
-
       setCurrentScan(completedScan);
       setIsScanning(false);
       toast.success('¡Escaneo completado con éxito!', { duration: 2000 });
-      
     } catch (error) {
       console.error('Scan error:', error);
-      const failedScan: Scan = {
+      const failedScan: ScanWithHarvester = {
         ...newScan,
         status: 'failed'
       };
-      
       setCurrentScan(failedScan);
       setIsScanning(false);
       toast.error('Error durante el escaneo');
@@ -208,33 +204,19 @@ const Scanner = () => {
       return;
     }
     setSaveScanClicked(true);
-    let success = false;
+    let response = null;
     if (currentScan.scan_type === 'whois') {
-      const response = await saveWhoisScan(currentScan, parseInt(user.id));
-      if (response && response.scan_id) {
-        setDbScanId(response.scan_id);
-        setScanSaved(true);
-        toast.success('Escaneo guardado correctamente');
-      }
-      success = response.success;
+      response = await saveWhoisScan(currentScan, parseInt(user.id));
     } else if (currentScan.scan_type === 'nmap') {
-      const response = await saveNmapScan(currentScan, parseInt(user.id));
-      if (response && response.scan_id) {
-        setDbScanId(response.scan_id);
-        setScanSaved(true);
-        toast.success('Escaneo guardado correctamente');
-      }
-      success = response.success;
+      response = await saveNmapScan(currentScan, parseInt(user.id));
     } else if (currentScan.scan_type === 'fuzzing') {
-      const response = await saveFuzzingScan(currentScan, parseInt(user.id));
-      if (response && response.scan_id) {
-        setDbScanId(response.scan_id);
-        setScanSaved(true);
-        toast.success('Escaneo guardado correctamente');
-      }
-      success = response.success;
+      response = await saveFuzzingScan(currentScan, parseInt(user.id));
     }
-    if (!success) {
+    if (response && response.success) {
+      if (response.scan_id) setDbScanId(response.scan_id);
+      setScanSaved(true);
+      toast.success('Escaneo guardado correctamente');
+    } else {
       toast.error('Error al guardar el escaneo');
       setScanSaved(false);
       setSaveScanClicked(false);
@@ -295,24 +277,6 @@ const Scanner = () => {
     }
   };
 
-  // Simular datos de estadísticas
-  const simulatedStats = {
-    yourScore: Math.floor(Math.random() * 100),
-    averageScore: 65,
-    sites: [
-      { name: 'Tu sitio', score: Math.floor(Math.random() * 100) },
-      { name: 'Sitio A', score: 80 },
-      { name: 'Sitio B', score: 60 },
-      { name: 'Sitio C', score: 40 },
-    ],
-    breakdown: [
-      { type: 'Fuzzing', value: Math.floor(Math.random() * 100) },
-      { type: 'Nmap', value: Math.floor(Math.random() * 100) },
-      { type: 'WHOIS', value: Math.floor(Math.random() * 100) },
-      { type: 'Subfinder', value: Math.floor(Math.random() * 100) },
-    ]
-  };
-
   // Nuevo: función para enviar mensaje libre a Ollama
   const handleChatbotSend = async () => {
     if (!chatInput.trim() || chatbotLoading) return;
@@ -370,6 +334,24 @@ const Scanner = () => {
     } catch (error) {
       toast.error('Error de conexión al guardar el reporte');
     }
+  };
+
+  // Simular datos de estadísticas
+  const simulatedStats = {
+    yourScore: Math.floor(Math.random() * 100),
+    averageScore: 65,
+    sites: [
+      { name: 'Tu sitio', score: Math.floor(Math.random() * 100) },
+      { name: 'Sitio A', score: 80 },
+      { name: 'Sitio B', score: 60 },
+      { name: 'Sitio C', score: 40 },
+    ],
+    breakdown: [
+      { type: 'Fuzzing', value: Math.floor(Math.random() * 100) },
+      { type: 'Nmap', value: Math.floor(Math.random() * 100) },
+      { type: 'WHOIS', value: Math.floor(Math.random() * 100) },
+      { type: 'Subfinder', value: Math.floor(Math.random() * 100) },
+    ]
   };
 
   return (
@@ -543,6 +525,149 @@ const Scanner = () => {
                           </div>
                         </div>
                       )}
+                      {scanType === 'whatweb' && currentScan.extraResult && (
+                        typeof currentScan.extraResult === 'string' ? (
+                          <div className="glass-card modern-shadow p-8 bg-gradient-to-br from-green-200 via-blue-100 to-blue-200 animate-fadeInUp rounded-3xl">
+                            <div className="flex items-center space-x-4 mb-6">
+                              <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-blue-400 rounded-3xl flex items-center justify-center shadow-xl">
+                                <span className="text-white text-4xl">🕵️‍♂️</span>
+                              </div>
+                              <div>
+                                <h3 className="text-3xl font-bold bg-gradient-to-r from-green-700 to-blue-700 bg-clip-text text-transparent">WhatWeb Resultados</h3>
+                                <p className="text-blue-900 text-base mt-1">Fingerprinting de tecnologías web</p>
+                              </div>
+                            </div>
+                            <pre className="bg-gradient-to-br from-green-100 to-blue-100 rounded-xl p-4 text-blue-900 whitespace-pre-wrap text-sm shadow-inner font-mono">{currentScan.extraResult}</pre>
+                          </div>
+                        ) : (
+                          <div className="glass-card modern-shadow p-8 bg-gradient-to-br from-green-200 via-blue-100 to-blue-200 animate-fadeInUp rounded-3xl">
+                            <div className="flex items-center space-x-4 mb-6">
+                              <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-blue-400 rounded-3xl flex items-center justify-center shadow-xl">
+                                <span className="text-white text-4xl">🕵️‍♂️</span>
+                              </div>
+                              <div>
+                                <h3 className="text-3xl font-bold bg-gradient-to-r from-green-700 to-blue-700 bg-clip-text text-transparent">WhatWeb Resultados</h3>
+                                <p className="text-blue-900 text-base mt-1">Fingerprinting de tecnologías web</p>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              {Object.entries(currentScan.extraResult).map(([cat, techs]) => (
+                                Array.isArray(techs) && techs.length > 0 && (
+                                  <div key={cat} className="bg-gradient-to-br from-white to-blue-50 rounded-2xl shadow p-4">
+                                    <div className="flex items-center mb-2">
+                                      <span className="text-2xl mr-2">{getWhatwebCategoryIcon(cat)}</span>
+                                      <span className="font-bold text-lg text-blue-800">{cat}</span>
+                                    </div>
+                                    <ul className="space-y-1">
+                                      {techs.map((t, idx) => (
+                                        <li key={idx} className="flex items-center space-x-2">
+                                          <span className="font-semibold text-gray-900">{t.name}</span>
+                                          {t.version && <span className="text-xs text-gray-500">v{t.version}</span>}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      )}
+                      {scanType === 'paramspider' && currentScan.extraResult && (
+                        <div className="glass-card modern-shadow p-8 bg-gradient-to-br from-violet-100 via-violet-200 to-fuchsia-100 animate-fadeInUp rounded-3xl">
+                          <div className="flex items-center space-x-4 mb-6">
+                            <div className="w-20 h-20 bg-gradient-to-br from-fuchsia-400 to-violet-500 rounded-3xl flex items-center justify-center shadow-xl">
+                              <span className="text-white text-4xl">🕷️</span>
+                            </div>
+                            <div>
+                              <h3 className="text-3xl font-bold bg-gradient-to-r from-fuchsia-700 to-violet-700 bg-clip-text text-transparent">Parámetros Encontrados</h3>
+                              <p className="text-violet-900 text-base mt-1">Extracción de parámetros vulnerables</p>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-3 max-h-96 overflow-y-auto">
+                            {currentScan.extraResult.split('\n').filter(l => l.startsWith('✅')).map((l, idx) => (
+                              <span key={idx} className="inline-flex items-center px-4 py-2 rounded-2xl bg-gradient-to-br from-violet-200 to-fuchsia-100 shadow font-mono text-base text-violet-900 border border-violet-200">
+                                <span className="text-fuchsia-600 mr-2">🔗</span>
+                                <span className="break-all">{l.replace('✅', '').trim()}</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {scanType === 'theharvester' && currentScan.extraResult && (
+                        <div className="glass-card modern-shadow p-8 bg-gradient-to-br from-blue-100 via-blue-200 to-cyan-100 animate-fadeInUp rounded-3xl">
+                          <div className="flex items-center space-x-4 mb-6">
+                            <div className="w-20 h-20 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-3xl flex items-center justify-center shadow-xl">
+                              <span className="text-white text-4xl">🔎</span>
+                            </div>
+                            <div>
+                              <h3 className="text-3xl font-bold bg-gradient-to-r from-blue-700 to-cyan-700 bg-clip-text text-transparent">theHarvester Resultados</h3>
+                              <p className="text-cyan-900 text-base mt-1">Recolección de correos, hosts y fuentes</p>
+                            </div>
+                          </div>
+                          <div className="space-y-6">
+                            {/* Correos */}
+                            <div>
+                              <div className="font-bold text-cyan-700 mb-2 flex items-center"><span className="mr-2 text-2xl">✉️</span>Correos encontrados:</div>
+                              {currentScan.extraResult.includes('📧') ? (
+                                <ul className="space-y-1">
+                                  {currentScan.extraResult.split('\n').filter(l => l.startsWith('✅') || l.startsWith('📧')).map((l, idx) => (
+                                    l.startsWith('📧') ? null : (
+                                      <li key={idx} className="flex items-center space-x-2">
+                                        <span className="text-cyan-600">✉️</span>
+                                        <span className="text-sm font-mono text-cyan-900 break-all">{l.replace('✅', '').trim()}</span>
+                                      </li>
+                                    )
+                                  ))}
+                                </ul>
+                              ) : (
+                                <div className="text-cyan-500 italic">No se encontraron correos.</div>
+                              )}
+                            </div>
+                            {/* Hosts/IPs */}
+                            <div>
+                              <div className="font-bold text-cyan-700 mb-2 flex items-center"><span className="mr-2 text-2xl">🌐</span>Hosts/IPs encontrados:</div>
+                              {currentScan.extraResult.includes('🌐') ? (
+                                <ul className="space-y-1">
+                                  {currentScan.extraResult.split('\n').filter(l => l.startsWith('🌐')).map((l, idx) => (
+                                    <li key={idx} className="flex items-center space-x-2">
+                                      <span className="text-cyan-600">🌐</span>
+                                      <span className="text-sm font-mono text-cyan-900 break-all">{l.replace('🌐', '').trim()}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <div className="text-cyan-500 italic">No se encontraron hosts/IPs.</div>
+                              )}
+                            </div>
+                            {/* Fuentes */}
+                            <div>
+                              <div className="font-bold text-cyan-700 mb-2 flex items-center"><span className="mr-2 text-2xl">🔗</span>Fuentes utilizadas:</div>
+                              {currentScan.extraResult.includes('🔎 Fuentes') ? (
+                                <ul className="space-y-1">
+                                  {currentScan.extraResult.split('\n').filter(l => l.startsWith('-')).map((l, idx) => (
+                                    <li key={idx} className="flex items-center space-x-2">
+                                      <span className="text-cyan-600">🔗</span>
+                                      <span className="text-sm font-mono text-cyan-900 break-all">{l.replace('-', '').trim()}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <div className="text-cyan-500 italic">No se encontraron fuentes.</div>
+                              )}
+                            </div>
+                            {/* RAW OUTPUT siempre disponible */}
+                            {currentScan.rawHarvester && (
+                              <details className="mt-6">
+                                <summary className="cursor-pointer font-semibold text-cyan-700">Ver salida completa de theHarvester (RAW)</summary>
+                                <pre className="bg-cyan-50 rounded-xl p-4 text-cyan-900 whitespace-pre-wrap text-xs shadow-inner mt-2 max-h-96 overflow-auto">
+                                  {currentScan.rawHarvester}
+                                </pre>
+                              </details>
+                            )}
+                          </div>
+                        </div>
+                      )}
                       
                       {/* Mostrar mensaje si no hay resultados */}
                       {currentScan.results.length === 0 && !currentScan.extraResult && (
@@ -664,3 +789,16 @@ const Scanner = () => {
 };
 
 export default Scanner;
+
+function getWhatwebCategoryIcon(cat) {
+  switch (cat) {
+    case 'CMS': return '📰';
+    case 'Web Server': return '🌐';
+    case 'Programming Language': return '💻';
+    case 'JS Framework': return '⚛️';
+    case 'Analytics': return '📊';
+    case 'Operating System': return '🖥️';
+    case 'CDN': return '🚀';
+    default: return '🔧';
+  }
+}

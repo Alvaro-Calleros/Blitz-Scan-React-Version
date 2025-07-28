@@ -3,6 +3,8 @@ import json
 import subprocess
 import platform
 from urllib.parse import urlparse
+import glob
+import re
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -100,6 +102,36 @@ def embellecer_nuclei(salida):
         return '🔍 No se detectaron vulnerabilidades.'
     salida_limpia = [f"🚨 Vulnerabilidades detectadas: {len(lines)}"]
     salida_limpia += [f"⚠️ {l}" for l in lines]
+    return '\n'.join(salida_limpia)
+
+# 🎨 Embellecedor de resultados WhatWeb
+
+def embellecer_whatweb(salida):
+    lines = [l.strip() for l in salida.splitlines() if l.strip()]
+    if not lines:
+        return '🔍 No se detectó información con WhatWeb.'
+    salida_limpia = [f"🕵️‍♂️ WhatWeb - Información detectada:"]
+    salida_limpia += [f"✅ {l}" for l in lines]
+    return '\n'.join(salida_limpia)
+
+# 🎨 Embellecedor de resultados ParamSpider
+
+def embellecer_paramspider(salida):
+    lines = [l.strip() for l in salida.splitlines() if l.strip() and not l.startswith('[INFO]')]
+    if not lines:
+        return '🔍 No se detectaron parámetros con ParamSpider.'
+    salida_limpia = [f"🕷️ ParamSpider - Parámetros encontrados:"]
+    salida_limpia += [f"✅ {l}" for l in lines]
+    return '\n'.join(salida_limpia)
+
+# 🎨 Embellecedor de resultados theHarvester
+
+def embellecer_theharvester(salida):
+    lines = [l.strip() for l in salida.splitlines() if l.strip()]
+    if not lines:
+        return '🔍 No se detectó información con theHarvester.'
+    salida_limpia = [f"🔎 theHarvester - Resultados:"]
+    salida_limpia += [f"✅ {l}" for l in lines]
     return '\n'.join(salida_limpia)
 
 # 🛰 Escaneo con Nmap
@@ -421,6 +453,198 @@ def escanear_subfinder():
     except Exception as e:
         return jsonify({'resultado': f'❌ Error inesperado:\n{str(e)}'}), 500
     return jsonify({'resultado': salida})
+
+# 🌐 Httpx
+@app.route('/httpx', methods=['POST'])
+def escanear_httpx():
+    objetivo = limpiar_objetivo(request.get_json().get('objetivo', ''))
+    if not objetivo:
+        return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
+    try:
+        # Se espera que el usuario pase una lista de dominios (uno por línea)
+        dominios = request.get_json().get('dominios', None)
+        if not dominios:
+            dominios = [objetivo]
+        if isinstance(dominios, str):
+            dominios = [dominios]
+        # Escribir dominios a un archivo temporal
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, mode='w', encoding='utf-8') as f:
+            for d in dominios:
+                f.write(d + '\n')
+            temp_path = f.name
+        resultado = subprocess.check_output([
+            r'C:\Users\santi\go\bin\httpx.exe',
+            '-l', temp_path,
+            '-silent'
+        ], text=True, stderr=subprocess.STDOUT)
+        os.unlink(temp_path)
+        salida = embellecer_httpx(resultado)
+    except subprocess.CalledProcessError as e:
+        return jsonify({'resultado': f'❌ Error en Httpx:\n{e.output}'}), 500
+    except Exception as e:
+        return jsonify({'resultado': f'❌ Error inesperado:\n{str(e)}'}), 500
+    return jsonify({'resultado': salida})
+
+# 🕵️‍♂️ WhatWeb
+@app.route('/whatweb', methods=['POST'])
+def escanear_whatweb():
+    objetivo = limpiar_objetivo(request.get_json().get('objetivo', ''))
+    if not objetivo:
+        return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
+    try:
+        resultado = subprocess.check_output([
+            r'C:\Ruby34-x64\bin\ruby.exe',
+            r'C:\Users\santi\WhatWeb\whatweb',
+            f'https://{objetivo}'
+        ], text=True, stderr=subprocess.STDOUT, cwd=r'C:\Users\santi\WhatWeb')
+        # Parsear la salida para extraer tecnologías y versiones
+        # Ejemplo: https://upsin.edu.mx [200 OK] Bootstrap[6.8.2], Frame, HTML5, HTTPServer[LiteSpeed], ...
+        import re
+        m = re.search(r'\[\d{3} [A-Z]+\] (.+)', resultado)
+        techs = []
+        if m:
+            techs_raw = m.group(1)
+            for t in techs_raw.split(','):
+                t = t.strip()
+                if not t:
+                    continue
+                # Extraer nombre y versión si existe
+                name_ver = re.match(r'([\w\-\s]+)(\[(.*?)\])?', t)
+                if name_ver:
+                    name = name_ver.group(1).strip()
+                    version = name_ver.group(3) if name_ver.group(3) else ''
+                    techs.append({'name': name, 'version': version})
+        # Agrupar por tipo básico usando keywords
+        categories = {
+            'CMS': ['WordPress', 'Drupal', 'Joomla'],
+            'Web Server': ['Apache', 'Nginx', 'LiteSpeed', 'HTTPServer'],
+            'Programming Language': ['PHP', 'Python', 'Ruby', 'Perl'],
+            'JS Framework': ['jQuery', 'React', 'Angular', 'Vue'],
+            'Analytics': ['Google Analytics', 'Piwik', 'Hotjar'],
+            'Operating System': ['Ubuntu', 'Linux', 'Windows'],
+            'CDN': ['Cloudflare'],
+            'Other': []
+        }
+        techs_by_cat = {k: [] for k in categories}
+        for tech in techs:
+            found = False
+            for cat, keys in categories.items():
+                if any(key.lower() in tech['name'].lower() for key in keys):
+                    techs_by_cat[cat].append(tech)
+                    found = True
+                    break
+            if not found:
+                techs_by_cat['Other'].append(tech)
+        return jsonify({'resultado': techs_by_cat})
+    except subprocess.CalledProcessError as e:
+        return jsonify({'resultado': f'❌ Error en WhatWeb:\n{e.output}'}), 500
+    except Exception as e:
+        return jsonify({'resultado': f'❌ Error inesperado:\n{str(e)}'}), 500
+
+# 🕷️ ParamSpider
+@app.route('/paramspider', methods=['POST'])
+def escanear_paramspider():
+    objetivo = limpiar_objetivo(request.get_json().get('objetivo', ''))
+    if not objetivo:
+        return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
+    try:
+        resultado = subprocess.check_output([
+            'py', '-m', 'paramspider.main', '--domain', objetivo
+        ], text=True, stderr=subprocess.STDOUT, cwd=r'C:\Users\santi\ParamSpider')
+        # Buscar el archivo de resultados generado
+        results_dir = os.path.join(r'C:\Users\santi\ParamSpider', 'results')
+        pattern = os.path.join(results_dir, f'{objetivo}*.txt')
+        files = glob.glob(pattern)
+        if files:
+            with open(files[0], 'r', encoding='utf-8', errors='ignore') as f:
+                params = [line.strip() for line in f if line.strip()]
+            salida = '🕷️ ParamSpider - Parámetros encontrados:\n' + '\n'.join(f'✅ {p}' for p in params[:50])
+            if len(params) > 50:
+                salida += f"\n... y {len(params)-50} más."
+        else:
+            salida = '🔍 No se encontraron parámetros en el archivo de resultados.'
+        return jsonify({'resultado': salida})
+    except subprocess.CalledProcessError as e:
+        return jsonify({'resultado': f'❌ Error en ParamSpider:\n{e.output}'}), 500
+    except Exception as e:
+        return jsonify({'resultado': f'❌ Error inesperado:\n{str(e)}'}), 500
+
+# 🔎 theHarvester
+@app.route('/theharvester', methods=['POST'])
+def escanear_theharvester():
+    objetivo = limpiar_objetivo(request.get_json().get('objetivo', ''))
+    if not objetivo:
+        return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
+    try:
+        resultado = subprocess.check_output([
+            'py', 'theHarvester.py', '-d', objetivo, '-b', 'all'
+        ], text=True, stderr=subprocess.STDOUT, cwd=r'C:\Users\santi\theHarvester')
+        # Parser robusto por bloques
+        correos = []
+        hosts = []
+        asns = []
+        urls = []
+        lines = resultado.splitlines()
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            # Emails block
+            if line.startswith('[*] Emails found:'):
+                i += 1
+                while i < len(lines) and (lines[i].strip() == '' or lines[i].startswith('-')):
+                    i += 1
+                while i < len(lines) and lines[i].strip() and not lines[i].startswith('['):
+                    correos.append(lines[i].strip())
+                    i += 1
+            # Hosts block
+            elif line.startswith('[*] Hosts found:'):
+                i += 1
+                while i < len(lines) and (lines[i].strip() == '' or lines[i].startswith('-')):
+                    i += 1
+                while i < len(lines) and lines[i].strip() and not lines[i].startswith('['):
+                    hosts.append(lines[i].strip())
+                    i += 1
+            # ASNS block
+            elif line.startswith('[*] ASNS found:'):
+                i += 1
+                while i < len(lines) and (lines[i].strip() == '' or lines[i].startswith('-')):
+                    i += 1
+                while i < len(lines) and lines[i].strip() and not lines[i].startswith('['):
+                    asns.append(lines[i].strip())
+                    i += 1
+            # Interesting URLs block
+            elif line.startswith('[*] Interesting Urls found:'):
+                i += 1
+                while i < len(lines) and (lines[i].strip() == '' or lines[i].startswith('-')):
+                    i += 1
+                while i < len(lines) and lines[i].strip() and not lines[i].startswith('['):
+                    urls.append(lines[i].strip())
+                    i += 1
+            else:
+                i += 1
+        # Fallback: regex si no se detectan bloques
+        import re
+        if not correos:
+            correos = list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', resultado)))
+        if not hosts:
+            hosts = list(set(re.findall(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b', resultado)))
+        salida = '🔎 theHarvester - Resultados organizados:\n'
+        salida += f"\n📧 Correos encontrados ({len(correos)}):\n" + '\n'.join(correos[:20])
+        if len(correos) > 20:
+            salida += f"\n... y {len(correos)-20} más."
+        salida += f"\n\n🌐 Hosts/IPs encontrados ({len(hosts)}):\n" + '\n'.join(hosts[:20])
+        if len(hosts) > 20:
+            salida += f"\n... y {len(hosts)-20} más."
+        if asns:
+            salida += f"\n\n🔢 ASNs encontrados ({len(asns)}):\n" + '\n'.join(asns)
+        if urls:
+            salida += f"\n\n🔗 URLs interesantes encontradas ({len(urls)}):\n" + '\n'.join(urls)
+        return jsonify({'resultado': salida, 'raw': resultado})
+    except subprocess.CalledProcessError as e:
+        return jsonify({'resultado': f'❌ Error en theHarvester:\n{e.output}', 'raw': e.output}), 500
+    except Exception as e:
+        return jsonify({'resultado': f'❌ Error inesperado:\n{str(e)}', 'raw': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

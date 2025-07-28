@@ -37,32 +37,6 @@ export const generateScanId = (): string => {
   return `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 };
 
-export const simulateScan = async (url: string, scanType: string): Promise<ScanResult[]> => {
-  // Simulate scan delay
-  await new Promise(resolve => setTimeout(resolve, 3000 + Math.random() * 2000));
-
-  const paths = ['/admin', '/backup', '/config', '/login', '/dashboard', '/api', '/uploads', '/test'];
-  const results: ScanResult[] = [];
-
-  for (let i = 0; i < Math.min(paths.length, 5 + Math.floor(Math.random() * 3)); i++) {
-    const path = paths[i];
-    const status = [200, 301, 302, 403, 404, 500][Math.floor(Math.random() * 6)];
-    
-    results.push({
-      id_fuzz_result: i + 1,
-      id_scan: generateScanId(),
-      path_found: path,
-      http_status: status,
-      response_size: Math.floor(Math.random() * 10000) + 500,
-      response_time: Math.random() * 2,
-      headers: `Content-Type: text/html; Server: ${['Apache/2.4.41', 'Nginx/1.18.0', 'IIS/10.0'][Math.floor(Math.random() * 3)]}`,
-      is_redirect: status >= 300 && status < 400
-    });
-  }
-
-  return results;
-};
-
 // Nuevo: obtener la clave de historial para un usuario
 export const getHistoryKey = (userEmail: string) =>
   `blitz_scan_history_${userEmail}`;
@@ -154,85 +128,6 @@ export const getScanById = async (scanId: number): Promise<any | null> => {
   }
 };
 
-// Función híbrida: intenta guardar en BD, si falla usa localStorage
-export const saveScan = async (scan: Scan, userId: number, userEmail: string): Promise<boolean> => {
-  try {
-    let extraResult = scan.extraResult;
-
-    // LOG de depuración
-    console.log('saveScan - original extraResult:', extraResult);
-
-    // Si es WHOIS y extraResult es un objeto, mándalo tal cual
-    if (scan.scan_type.toLowerCase() === 'whois' && typeof extraResult === 'object' && extraResult !== null) {
-      // Nada que hacer, ya es el objeto correcto
-    }
-    // Si es WHOIS y extraResult viene anidado en .resultado, usa ese objeto
-    else if (scan.scan_type.toLowerCase() === 'whois' && extraResult?.resultado && typeof extraResult.resultado === 'object') {
-      extraResult = extraResult.resultado;
-    }
-    // Si es WHOIS y extraResult es un string JSON, parsea
-    else if (scan.scan_type.toLowerCase() === 'whois' && typeof extraResult === 'string' && extraResult.includes('{')) {
-      try {
-        extraResult = JSON.parse(extraResult);
-      } catch (e) {
-        // Si falla, dejar el string
-      }
-    }
-    // Si es WHOIS y extraResult es un string embellecido, intentar parsear el JSON dentro del string
-    else if (scan.scan_type.toLowerCase() === 'whois' && typeof extraResult === 'string') {
-      const jsonStart = extraResult.indexOf('{');
-      if (jsonStart !== -1) {
-        try {
-          extraResult = JSON.parse(extraResult.substring(jsonStart));
-        } catch (e) {
-          // Si falla, dejar el string
-        }
-      }
-    }
-
-    // LOG de depuración
-    console.log('saveScan - FINAL extraResult que se enviará:', extraResult);
-
-    // Preparar los detalles para guardar
-    const detalles = {
-      results: scan.results || [],
-      scan_type: scan.scan_type,
-      timestamp: scan.timestamp,
-      extraResult: extraResult // <-- aquí va el objeto plano
-    };
-
-    const response = await fetch('http://localhost:3001/api/save-scan', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        userId: userId,
-        url: scan.url,
-        scanType: scan.scan_type,
-        results: [],
-        extraResult: detalles,
-        timestamp: scan.timestamp
-      }),
-    });
-
-    const data = await response.json();
-    if (data.success) {
-      console.log('Escaneo guardado en la base de datos:', data.message);
-      return true;
-    } else {
-      console.error('Error guardando escaneo:', data.message);
-      return false;
-    }
-  } catch (error) {
-    console.error('Error de conexión al guardar escaneo:', error);
-    return false;
-  }
-};
-
-// Elimina la función getScans y cualquier referencia a getScansFromDatabase o getSavedScans
-// Ya no se usa fallback a localStorage ni consulta general
-
 // Función para ocultar un escaneo (soft delete)
 export const hideScan = async (scanId: string, userId: number): Promise<boolean> => {
   try {
@@ -246,9 +141,7 @@ export const hideScan = async (scanId: string, userId: number): Promise<boolean>
         userId: parseInt(String(userId), 10)
       })
     });
-
     const data = await response.json();
-    
     if (data.success) {
       console.log('Escaneo ocultado exitosamente');
       return true;
@@ -276,9 +169,7 @@ export const hideMultipleScans = async (scanIds: string[], userId: number): Prom
         userId: parseInt(String(userId), 10)
       })
     });
-
     const data = await response.json();
-    
     if (data.success) {
       console.log('Escaneos ocultados exitosamente');
       return true;
@@ -368,7 +259,7 @@ const formatScanResults = (scan: Scan): string => {
 
         // Contacto técnico
         if (whoisData.tech_contact) {
-          output += '\n🔧 CONTACTO TÉCNICO\n';
+          output += '\n�� CONTACTO TÉCNICO\n';
           output += `   • Nombre: ${whoisData.tech_contact.name || 'No disponible'}\n`;
           if (whoisData.tech_contact.city && whoisData.tech_contact.city !== 'No disponible') {
             output += `   • Ciudad: ${whoisData.tech_contact.city}\n`;
@@ -550,15 +441,12 @@ const API_BASE = 'http://localhost:5000';
 // Función auxiliar para extraer dominio de URL
 function extractDomain(url: string): string {
   try {
-    // Si no tiene protocolo, agregar https://
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://' + url;
     }
-    
     const urlObj = new URL(url);
     return urlObj.hostname;
   } catch {
-    // Si falla el parsing, intentar limpiar manualmente
     return url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
   }
 }
@@ -571,36 +459,28 @@ export const scanFuzzing = async (url: string): Promise<ScanResult[]> => {
     body: JSON.stringify({ objetivo: domain })
   });
   const data = await res.json();
-  
-  // Procesar el resultado embellecido del backend
   const results: ScanResult[] = [];
   let id = 1;
   const lines = (data.resultado || '').split('\n');
-  
   for (const line of lines) {
-    // Buscar líneas que contengan información de rutas encontradas
-    // Formato: "✅ [200] /admin (4096)" o "➡️ [301] /login -> /dashboard (512)"
     const match = line.match(/[✅➡️⚠️]\s*\[(\d{3})\]\s*([^\s]+)(?:\s*->\s*([^\s]+))?\s*\((\d*)\)/);
     if (match) {
       const http_status = parseInt(match[1], 10);
       const path_found = match[2];
       const redirect_to = match[3] || '';
       const response_size = parseInt(match[4] || '0', 10);
-      
       results.push({
         id_fuzz_result: id++,
         id_scan: generateScanId(),
         path_found: redirect_to ? `${path_found} → ${redirect_to}` : path_found,
         http_status,
         response_size,
-        response_time: Math.random() * 2 + 0.1, // Simular tiempo real
+        response_time: Math.random() * 2 + 0.1,
         headers: `Content-Type: text/html; Server: ${['Apache/2.4.41', 'Nginx/1.18.0', 'IIS/10.0'][Math.floor(Math.random() * 3)]}`,
         is_redirect: http_status >= 300 && http_status < 400
       });
     }
   }
-  
-  // Si no se encontraron resultados, agregar algunos ejemplos para mostrar el formato
   if (results.length === 0) {
     results.push({
       id_fuzz_result: 1,
@@ -613,7 +493,6 @@ export const scanFuzzing = async (url: string): Promise<ScanResult[]> => {
       is_redirect: false
     });
   }
-  
   return results;
 };
 
@@ -625,49 +504,21 @@ export const scanNmap = async (url: string): Promise<any> => {
     body: JSON.stringify({ objetivo: domain })
   });
   const data = await res.json();
-  const nmapResult = data.resultado || '';
-
-  // Nuevo parser tolerante: acepta tanto el formato embellecido como el original
-  const openPorts: Array<{port: string, service: string, version?: string}> = [];
-  const lines = nmapResult.split('\n');
-  for (const line of lines) {
-    // Buscar líneas con puertos abiertos (original Nmap o embellecido)
-    // Ejemplo original: "22/tcp open ssh" o "80/tcp open http"
-    // Ejemplo embellecido: "✅ 80/tcp open http"
-    const match = line.match(/(\d+)\/(tcp|udp)\s+open\s+(\w+)(?:\s+([\w\-.]+))?/i);
-    if (match) {
-      const port = match[1];
-      const protocol = match[2];
-      const service = match[3] || 'Desconocido';
-      const version = match[4] || '';
-      openPorts.push({
-        port: `${port}/${protocol}`,
-        service,
-        version: version.trim()
-      });
-    }
-  }
-  return { raw: nmapResult, openPorts };
+  return data.resultado || '';
 };
 
 export const scanWhois = async (url: string): Promise<any> => {
   const domain = extractDomain(url);
-      const res = await fetch(`${API_BASE}/whois`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ objetivo: domain })
-      });
-      const data = await res.json();
-
-  // Si ya es un objeto, simplemente devuélvelo
+  const res = await fetch(`${API_BASE}/whois`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ objetivo: domain })
+  });
+  const data = await res.json();
   if (typeof data.resultado === 'object') {
     return data.resultado;
   }
-
-  // Si es un string, sigue con el procesamiento anterior
-  const whoisRaw = data.resultado || 'Error al obtener información WHOIS';
-  // ... aquí tu lógica de parseo de string si lo necesitas ...
-  return whoisRaw;
+  return data.resultado || 'Error al obtener información WHOIS';
 };
 
 export const scanSubfinder = async (url: string): Promise<string> => {
@@ -679,6 +530,42 @@ export const scanSubfinder = async (url: string): Promise<string> => {
   });
   const data = await res.json();
   return data.resultado || 'No se encontraron subdominios.';
+};
+
+export const scanParamspider = async (url: string): Promise<string> => {
+  const domain = extractDomain(url);
+  const res = await fetch(`${API_BASE}/paramspider`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ objetivo: domain })
+  });
+  const data = await res.json();
+  return data.resultado || 'No se encontraron parámetros.';
+};
+
+export const scanWhatweb = async (url: string): Promise<string> => {
+  const domain = extractDomain(url);
+  const res = await fetch(`${API_BASE}/whatweb`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ objetivo: domain })
+  });
+  const data = await res.json();
+  return data.resultado || 'No se obtuvo información de WhatWeb.';
+};
+
+export const scanTheharvester = async (url: string): Promise<{ beautified: string, raw: string }> => {
+  const domain = extractDomain(url);
+  const res = await fetch('http://localhost:5000/theharvester', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ objetivo: domain })
+  });
+  const data = await res.json();
+  return {
+    beautified: data.resultado || '',
+    raw: data.raw || ''
+  };
 };
 
 // Función para extraer datos clave de un texto plano de WHOIS y devolver un objeto estructurado
