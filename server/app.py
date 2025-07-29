@@ -17,6 +17,14 @@ CORS(app)
 IS_WINDOWS = platform.system() == 'Windows'
 WHOIS_CMD = 'whois64' if IS_WINDOWS else 'whois'
 
+# Rutas de las herramientas instaladas
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(CURRENT_DIR)
+DIRSEARCH_PATH = os.path.join(PROJECT_ROOT, 'dirsearch', 'dirsearch.py')
+PARAMSPIDER_PATH = os.path.join(PROJECT_ROOT, 'ParamSpider')
+WHATWEB_PATH = os.path.join(PROJECT_ROOT, 'WhatWeb')
+THEHARVESTER_PATH = os.path.join(PROJECT_ROOT, 'theHarvester')
+
 def limpiar_objetivo(url):
     print(f"Original URL: {url}")
     
@@ -165,8 +173,7 @@ def escanear_directorios():
 
     try:
         resultado = subprocess.check_output([
-            r'C:\Users\LAMorales\AppData\Local\Programs\Python\Python313\python.exe',
-            r'C:\Users\LAMorales\dirsearch\dirsearch.py',
+            'py', DIRSEARCH_PATH,
             '-u', f'https://{objetivo}',
             '-e', 'php,html,txt',
             '-x', '403,404,520',
@@ -443,7 +450,7 @@ def escanear_subfinder():
         return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
     try:
         resultado = subprocess.check_output([
-            r'C:\Users\alvar\go\bin\subfinder.exe',
+            'subfinder',
             '-d', objetivo,
             '-silent'
         ], text=True, stderr=subprocess.STDOUT)
@@ -474,7 +481,7 @@ def escanear_httpx():
                 f.write(d + '\n')
             temp_path = f.name
         resultado = subprocess.check_output([
-            r'C:\Users\santi\go\bin\httpx.exe',
+            'httpx',
             '-l', temp_path,
             '-silent'
         ], text=True, stderr=subprocess.STDOUT)
@@ -495,9 +502,9 @@ def escanear_whatweb():
     try:
         resultado = subprocess.check_output([
             r'C:\Ruby34-x64\bin\ruby.exe',
-            r'C:\Users\santi\WhatWeb\whatweb',
+            os.path.join(WHATWEB_PATH, 'whatweb'),
             f'https://{objetivo}'
-        ], text=True, stderr=subprocess.STDOUT, cwd=r'C:\Users\santi\WhatWeb')
+        ], text=True, stderr=subprocess.STDOUT, cwd=WHATWEB_PATH)
         # Parsear la salida para extraer tecnologías y versiones
         # Ejemplo: https://upsin.edu.mx [200 OK] Bootstrap[6.8.2], Frame, HTML5, HTTPServer[LiteSpeed], ...
         import re
@@ -551,9 +558,9 @@ def escanear_paramspider():
     try:
         resultado = subprocess.check_output([
             'py', '-m', 'paramspider.main', '--domain', objetivo
-        ], text=True, stderr=subprocess.STDOUT, cwd=r'C:\Users\santi\ParamSpider')
+        ], text=True, stderr=subprocess.STDOUT, cwd=PARAMSPIDER_PATH)
         # Buscar el archivo de resultados generado
-        results_dir = os.path.join(r'C:\Users\santi\ParamSpider', 'results')
+        results_dir = os.path.join(PARAMSPIDER_PATH, 'results')
         pattern = os.path.join(results_dir, f'{objetivo}*.txt')
         files = glob.glob(pattern)
         if files:
@@ -578,8 +585,8 @@ def escanear_theharvester():
         return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
     try:
         resultado = subprocess.check_output([
-            'py', 'theHarvester.py', '-d', objetivo, '-b', 'all'
-        ], text=True, stderr=subprocess.STDOUT, cwd=r'C:\Users\santi\theHarvester')
+            'py', '-m', 'theHarvester', '-d', objetivo, '-b', 'all'
+        ], text=True, stderr=subprocess.STDOUT)
         # Parser robusto por bloques
         correos = []
         hosts = []

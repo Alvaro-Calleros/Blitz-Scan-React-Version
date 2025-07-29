@@ -6,6 +6,7 @@ import Navbar from '../components/Navbar';
 import WhoisResult from '../components/WhoisResult';
 import NmapResult from '../components/NmapResult';
 import FuzzingResult from '../components/FuzzingResult';
+import WhatWebResult from '../components/WhatWebResult';
 
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/table';
 import { ChartContainer } from '../components/ui/chart';
@@ -526,52 +527,7 @@ const Scanner = () => {
                         </div>
                       )}
                       {scanType === 'whatweb' && currentScan.extraResult && (
-                        typeof currentScan.extraResult === 'string' ? (
-                          <div className="glass-card modern-shadow p-8 bg-gradient-to-br from-green-200 via-blue-100 to-blue-200 animate-fadeInUp rounded-3xl">
-                            <div className="flex items-center space-x-4 mb-6">
-                              <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-blue-400 rounded-3xl flex items-center justify-center shadow-xl">
-                                <span className="text-white text-4xl">🕵️‍♂️</span>
-                              </div>
-                              <div>
-                                <h3 className="text-3xl font-bold bg-gradient-to-r from-green-700 to-blue-700 bg-clip-text text-transparent">WhatWeb Resultados</h3>
-                                <p className="text-blue-900 text-base mt-1">Fingerprinting de tecnologías web</p>
-                              </div>
-                            </div>
-                            <pre className="bg-gradient-to-br from-green-100 to-blue-100 rounded-xl p-4 text-blue-900 whitespace-pre-wrap text-sm shadow-inner font-mono">{currentScan.extraResult}</pre>
-                          </div>
-                        ) : (
-                          <div className="glass-card modern-shadow p-8 bg-gradient-to-br from-green-200 via-blue-100 to-blue-200 animate-fadeInUp rounded-3xl">
-                            <div className="flex items-center space-x-4 mb-6">
-                              <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-blue-400 rounded-3xl flex items-center justify-center shadow-xl">
-                                <span className="text-white text-4xl">🕵️‍♂️</span>
-                              </div>
-                              <div>
-                                <h3 className="text-3xl font-bold bg-gradient-to-r from-green-700 to-blue-700 bg-clip-text text-transparent">WhatWeb Resultados</h3>
-                                <p className="text-blue-900 text-base mt-1">Fingerprinting de tecnologías web</p>
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              {Object.entries(currentScan.extraResult).map(([cat, techs]) => (
-                                Array.isArray(techs) && techs.length > 0 && (
-                                  <div key={cat} className="bg-gradient-to-br from-white to-blue-50 rounded-2xl shadow p-4">
-                                    <div className="flex items-center mb-2">
-                                      <span className="text-2xl mr-2">{getWhatwebCategoryIcon(cat)}</span>
-                                      <span className="font-bold text-lg text-blue-800">{cat}</span>
-                                    </div>
-                                    <ul className="space-y-1">
-                                      {techs.map((t, idx) => (
-                                        <li key={idx} className="flex items-center space-x-2">
-                                          <span className="font-semibold text-gray-900">{t.name}</span>
-                                          {t.version && <span className="text-xs text-gray-500">v{t.version}</span>}
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                )
-                              ))}
-                            </div>
-                          </div>
-                        )
+                        <WhatWebResult result={currentScan.extraResult} />
                       )}
                       {scanType === 'paramspider' && currentScan.extraResult && (
                         <div className="glass-card modern-shadow p-8 bg-gradient-to-br from-violet-100 via-violet-200 to-fuchsia-100 animate-fadeInUp rounded-3xl">
@@ -744,6 +700,36 @@ const Scanner = () => {
           <span className="hidden sm:inline font-semibold">Ir arriba</span>
         </button>
       )}
+      
+      {/* Botón flotante para guardar escaneo */}
+      {currentScan && currentScan.status === 'completed' && !scanSaved && (
+        <button
+          onClick={handleSaveScan}
+          disabled={saveScanClicked}
+          className="fixed bottom-8 left-8 z-50 bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-full shadow-lg p-4 hover:scale-110 transition-transform flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          aria-label="Guardar escaneo"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+          </svg>
+          <span className="hidden sm:inline font-semibold">Guardar</span>
+        </button>
+      )}
+      
+      {/* Botón flotante para generar reporte con IA */}
+      {currentScan && currentScan.status === 'completed' && scanSaved && (
+        <button
+          onClick={handleGenerateReport}
+          className="fixed bottom-20 left-8 z-50 bg-gradient-to-br from-purple-500 to-pink-600 text-white rounded-full shadow-lg p-4 hover:scale-110 transition-transform flex items-center space-x-2"
+          aria-label="Generar reporte con IA"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+          </svg>
+          <span className="hidden sm:inline font-semibold">IA Reporte</span>
+        </button>
+      )}
+      
       {/* Botón flotante para ir abajo */}
       {showScrollBottom && (
         <button
@@ -790,15 +776,4 @@ const Scanner = () => {
 
 export default Scanner;
 
-function getWhatwebCategoryIcon(cat) {
-  switch (cat) {
-    case 'CMS': return '📰';
-    case 'Web Server': return '🌐';
-    case 'Programming Language': return '💻';
-    case 'JS Framework': return '⚛️';
-    case 'Analytics': return '📊';
-    case 'Operating System': return '🖥️';
-    case 'CDN': return '🚀';
-    default: return '🔧';
-  }
-}
+
