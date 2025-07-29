@@ -9,7 +9,7 @@ import traceback
 import requests
 import openai
 
-OPENAI_API_KEY = "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"
+OPENAI_API_KEY = "..." #TODO: Cambiar por la API key de OpenAI
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": "http://localhost:8080"}})
@@ -127,6 +127,34 @@ def save_scan():
                     'INSERT INTO fuzzing_scans (id_escaneos, fuzzing_data) VALUES (%s, %s)',
                     (escaneo_id, json.dumps(fuzzing_data))
                 )
+        elif scan_type == 'theharvester':
+            theharvester_data = data.get('theHarvesterData') or data.get('extraResult')
+            if theharvester_data:
+                db.execute_query(
+                    'INSERT INTO theharvester_scans (id_escaneos, theharvester_data) VALUES (%s, %s)',
+                    (escaneo_id, json.dumps(theharvester_data))
+                )
+        elif scan_type == 'whatweb':
+            whatweb_data = data.get('whatwebData') or data.get('extraResult')
+            if whatweb_data:
+                db.execute_query(
+                    'INSERT INTO whatweb_scans (id_escaneos, whatweb_data) VALUES (%s, %s)',
+                    (escaneo_id, json.dumps(whatweb_data))
+                )
+        elif scan_type == 'paramspider':
+            paramspider_data = data.get('paramspiderData') or data.get('extraResult')
+            if paramspider_data:
+                db.execute_query(
+                    'INSERT INTO paramspider_scans (id_escaneos, paramspider_data) VALUES (%s, %s)',
+                    (escaneo_id, json.dumps(paramspider_data))
+                )
+        elif scan_type == 'subfinder':
+            subfinder_data = data.get('subfinderData') or data.get('extraResult')
+            if subfinder_data:
+                db.execute_query(
+                    'INSERT INTO subfinder_scans (id_escaneos, subfinder_data) VALUES (%s, %s)',
+                    (escaneo_id, json.dumps(subfinder_data))
+                )
 
         return jsonify({
             'success': True,
@@ -214,6 +242,18 @@ def get_scan(scan_id):
         elif scan['tipo_escaneo'] == 'fuzzing':
             fuzzing = db.execute_one('SELECT fuzzing_data FROM fuzzing_scans WHERE id_escaneos = %s', (scan_id,))
             details = fuzzing['fuzzing_data'] if fuzzing else None
+        elif scan['tipo_escaneo'] == 'theharvester':
+            theharvester = db.execute_one('SELECT theharvester_data FROM theharvester_scans WHERE id_escaneos = %s', (scan_id,))
+            details = theharvester['theharvester_data'] if theharvester else None
+        elif scan['tipo_escaneo'] == 'whatweb':
+            whatweb = db.execute_one('SELECT whatweb_data FROM whatweb_scans WHERE id_escaneos = %s', (scan_id,))
+            details = whatweb['whatweb_data'] if whatweb else None
+        elif scan['tipo_escaneo'] == 'paramspider':
+            paramspider = db.execute_one('SELECT paramspider_data FROM paramspider_scans WHERE id_escaneos = %s', (scan_id,))
+            details = paramspider['paramspider_data'] if paramspider else None
+        elif scan['tipo_escaneo'] == 'subfinder':
+            subfinder = db.execute_one('SELECT subfinder_data FROM subfinder_scans WHERE id_escaneos = %s', (scan_id,))
+            details = subfinder['subfinder_data'] if subfinder else None
         # Construir respuesta: los metadatos + el JSON completo de la tabla secundaria
         response = {
             'id': scan['id'],
@@ -527,6 +567,82 @@ def get_fuzzing_scans(user_id):
         print(f"Error obteniendo escaneos FUZZING: {e}")
         return jsonify({'success': False, 'message': 'Error al obtener escaneos FUZZING'}), 500
 
+# --- ENDPOINTS PARA ESCANEOS SUBFINDER ---
+@app.route('/api/get-subfinder-scans/<int:user_id>', methods=['GET'])
+def get_subfinder_scans(user_id):
+    try:
+        scans = db.execute_query(
+            '''
+            SELECT e.id, e.url, e.fecha, e.estado, s.subfinder_data
+            FROM escaneos e
+            JOIN subfinder_scans s ON e.id = s.id_escaneos
+            WHERE e.id_usuario = %s AND e.tipo_escaneo = 'subfinder' AND e.eliminado = FALSE
+            ORDER BY e.fecha DESC
+            ''',
+            (user_id,)
+        )
+        return jsonify({'success': True, 'scans': scans})
+    except Exception as e:
+        print(f"Error obteniendo escaneos SUBFINDER: {e}")
+        return jsonify({'success': False, 'message': 'Error al obtener escaneos SUBFINDER'}), 500
+
+# --- ENDPOINTS PARA ESCANEOS PARAMSPIDER ---
+@app.route('/api/get-paramspider-scans/<int:user_id>', methods=['GET'])
+def get_paramspider_scans(user_id):
+    try:
+        scans = db.execute_query(
+            '''
+            SELECT e.id, e.url, e.fecha, e.estado, p.paramspider_data
+            FROM escaneos e
+            JOIN paramspider_scans p ON e.id = p.id_escaneos
+            WHERE e.id_usuario = %s AND e.tipo_escaneo = 'paramspider' AND e.eliminado = FALSE
+            ORDER BY e.fecha DESC
+            ''',
+            (user_id,)
+        )
+        return jsonify({'success': True, 'scans': scans})
+    except Exception as e:
+        print(f"Error obteniendo escaneos PARAMSPIDER: {e}")
+        return jsonify({'success': False, 'message': 'Error al obtener escaneos PARAMSPIDER'}), 500
+
+# --- ENDPOINTS PARA ESCANEOS WHATWEB ---
+@app.route('/api/get-whatweb-scans/<int:user_id>', methods=['GET'])
+def get_whatweb_scans(user_id):
+    try:
+        scans = db.execute_query(
+            '''
+            SELECT e.id, e.url, e.fecha, e.estado, w.whatweb_data
+            FROM escaneos e
+            JOIN whatweb_scans w ON e.id = w.id_escaneos
+            WHERE e.id_usuario = %s AND e.tipo_escaneo = 'whatweb' AND e.eliminado = FALSE
+            ORDER BY e.fecha DESC
+            ''',
+            (user_id,)
+        )
+        return jsonify({'success': True, 'scans': scans})
+    except Exception as e:
+        print(f"Error obteniendo escaneos WHATWEB: {e}")
+        return jsonify({'success': False, 'message': 'Error al obtener escaneos WHATWEB'}), 500
+
+# --- ENDPOINTS PARA ESCANEOS THEHARVESTER ---
+@app.route('/api/get-theharvester-scans/<int:user_id>', methods=['GET'])
+def get_theharvester_scans(user_id):
+    try:
+        scans = db.execute_query(
+            '''
+            SELECT e.id, e.url, e.fecha, e.estado, t.theharvester_data
+            FROM escaneos e
+            JOIN theharvester_scans t ON e.id = t.id_escaneos
+            WHERE e.id_usuario = %s AND e.tipo_escaneo = 'theharvester' AND e.eliminado = FALSE
+            ORDER BY e.fecha DESC
+            ''',
+            (user_id,)
+        )
+        return jsonify({'success': True, 'scans': scans})
+    except Exception as e:
+        print(f"Error obteniendo escaneos THEHARVESTER: {e}")
+        return jsonify({'success': False, 'message': 'Error al obtener escaneos THEHARVESTER'}), 500
+
 
 # IA para generar reportes, LLM local con ollama
 @app.route('/generate_report', methods=['POST'])
@@ -534,89 +650,114 @@ def generate_report():
     data = request.get_json()
     scan_type = data.get('scan_type')
     scan_data = data.get('scan_data')
+    conversation_context = data.get('context', {})  # Contexto de la conversación
 
     if not scan_type or not scan_data:
         return jsonify({'error': 'Missing scan_type or scan_data'}), 400
 
-    # Prompt por tipo de escaneo, ahora más breve
-    if scan_type == 'nmap':
+    # Determinar el tipo de consulta
+    is_general_chat = scan_type == 'chat'
+    
+    if is_general_chat:
+        # Chat general - prompt más conversacional con contexto
+        context_info = ""
+        if conversation_context.get('currentScan'):
+            scan = conversation_context['currentScan']
+            context_info = f"\nCONTEXTO DEL ESCANEO ACTUAL: {scan.get('type', 'N/A')} en {scan.get('url', 'N/A')}"
+        
+        history_info = ""
+        if conversation_context.get('conversationHistory'):
+            history = conversation_context['conversationHistory']
+            if len(history) > 0:
+                recent_messages = history[-3:]  # Últimos 3 mensajes
+                history_info = "\nHISTORIAL RECIENTE:\n" + "\n".join([f"{msg['sender']}: {msg['text']}" for msg in recent_messages])
+        
         prompt = f"""
-Eres un experto en ciberseguridad. Recibirás el resultado de un escaneo Nmap en formato JSON o texto. 
-Analiza los puertos abiertos, servicios detectados y vulnerabilidades. 
-Proporciona un resumen profesional que incluya:
-- Puertos y servicios relevantes encontrados.
-- Vulnerabilidades o riesgos detectados (si los hay).
-- Una recomendación clara y prioritaria para mitigar el riesgo principal.
+Eres BlitzScanIA, un asistente de ciberseguridad amigable y experto.
 
-Ejemplo de entrada:
-{{
-  "open_ports": [22, 80, 443],
-  "services": ["ssh", "http", "https"],
-  "vulnerabilities": ["SSH outdated", "XSS"]
-}}
+INSTRUCCIONES:
+- Responde de forma clara y accesible
+- Proporciona información práctica y útil
+- SOLO recomienda herramientas que están disponibles en BlitzScan
+- Mantén un tono conversacional pero profesional
+- NO generes reportes estructurados para preguntas simples
+- Usa markdown para formatear cuando sea apropiado
+- Considera el contexto de la conversación previa
+- Si hay un escaneo activo, referencia sus resultados cuando sea relevante
+- NO menciones herramientas externas como Nessus, OpenVAS, OWASP ZAP, etc.
 
-Ejemplo de respuesta:
-Se detectaron los puertos 22 (SSH), 80 (HTTP) y 443 (HTTPS) abiertos. Riesgo: el servicio SSH está desactualizado y hay una vulnerabilidad XSS. 
-Recomendación: Actualizar SSH y aplicar filtros de entrada para prevenir XSS.
+HERRAMIENTAS DISPONIBLES EN BLITZSCAN:
+- Fuzzing Web: Búsqueda de directorios y archivos ocultos
+- Nmap Scan: Escaneo de puertos y servicios  
+- WHOIS Lookup: Información del dominio y registrante
+- Subfinder: Enumeración de subdominios
+- ParamSpider: Extracción de parámetros vulnerables
+- WhatWeb: Fingerprinting de tecnologías web
+- theHarvester: Recolección de correos y hosts públicos
 
-Ahora analiza este escaneo:
-{scan_data}
-"""
-    elif scan_type == 'fuzzing':
-        prompt = f"""
-Eres un experto en ciberseguridad web. Recibirás resultados de un fuzzing web en formato JSON o texto.
-Analiza las rutas encontradas, los códigos de estado HTTP y posibles riesgos.
-Proporciona un resumen profesional que incluya:
-- Rutas sensibles o peligrosas detectadas.
-- Riesgo principal asociado a las rutas encontradas.
-- Una recomendación prioritaria para mitigar el riesgo.
+PREGUNTA DEL USUARIO: {scan_data}
+{context_info}
+{history_info}
 
-Ejemplo de entrada:
-[
-  {{"path_found": "/admin", "http_status": 200}},
-  {{"path_found": "/backup", "http_status": 403}}
-]
-
-Ejemplo de respuesta:
-Se encontró la ruta /admin accesible públicamente. Riesgo: acceso no autorizado a panel de administración. 
-Recomendación: Restringir el acceso a /admin mediante autenticación robusta.
-
-Ahora analiza este resultado de fuzzing:
-{scan_data}
-"""
-    elif scan_type == 'whois':
-        prompt = f"""
-Eres un experto en ciberseguridad y análisis de dominios. Recibirás un resultado WHOIS en formato JSON.
-Analiza el estado del dominio, fechas de expiración, registrante y cualquier advertencia relevante.
-Proporciona un resumen profesional que incluya:
-- Estado actual del dominio y su registrador.
-- Advertencia clave (por ejemplo, expiración próxima, datos públicos, etc.).
-- Una recomendación principal para mejorar la seguridad o gestión del dominio.
-
-Ejemplo de entrada:
-{{
-  "domain_name": "example.com",
-  "registrar": "GoDaddy",
-  "creation_date": "2020-01-01",
-  "expiration_date": "2025-01-01",
-  "registrant": {{"name": "John Doe", "country": "US"}}
-}}
-
-Ejemplo de respuesta:
-El dominio example.com está registrado en GoDaddy y expira en 2025. Advertencia: los datos del registrante son públicos. 
-Recomendación: activar privacidad WHOIS y renovación automática.
-
-Ahora analiza este resultado WHOIS:
-{scan_data}
+Responde de manera natural y útil, recomendando SOLO las herramientas de BlitzScan.
 """
     else:
+        # Reporte de seguridad estructurado
+        context_info = ""
+        if conversation_context.get('currentScan'):
+            scan = conversation_context['currentScan']
+            context_info = f"\nCONTEXTO DEL ESCANEO: {scan.get('type', 'N/A')} en {scan.get('url', 'N/A')} - {scan.get('timestamp', 'N/A')}"
+        
         prompt = f"""
-Eres un experto en ciberseguridad. Analiza la siguiente información y proporciona:
-- Un resumen profesional del riesgo principal detectado.
-- Una recomendación prioritaria para mitigar el riesgo.
+Eres BlitzScanIA, un experto asistente de ciberseguridad especializado en análisis de seguridad web.
 
-Consulta:
+TAREA: Generar un reporte de seguridad profesional y estructurado.
+
+INSTRUCCIONES:
+- Analiza los datos del escaneo proporcionados
+- Identifica vulnerabilidades y riesgos específicos
+- Proporciona recomendaciones prácticas y priorizadas
+- Usa un tono profesional pero accesible
+- Estructura la respuesta con secciones claras usando markdown
+- Considera el contexto del escaneo actual
+- Incluye métricas de riesgo cuando sea posible
+- SOLO recomienda herramientas de BlitzScan para análisis adicionales
+- NO menciones herramientas externas como Nessus, OpenVAS, OWASP ZAP, etc.
+
+HERRAMIENTAS DISPONIBLES EN BLITZSCAN PARA ANÁLISIS ADICIONALES:
+- Fuzzing Web: Para encontrar rutas sensibles y archivos ocultos
+- Nmap Scan: Para análisis completo de puertos y servicios
+- WHOIS Lookup: Para información del dominio y registrante
+- Subfinder: Para enumeración de subdominios
+- ParamSpider: Para detectar parámetros vulnerables
+- WhatWeb: Para fingerprinting de tecnologías
+- theHarvester: Para recolección de información de la organización
+
+FORMATO DEL REPORTE:
+## 🔍 Resumen Ejecutivo
+[Breve resumen de los hallazgos principales]
+
+## 🚨 Vulnerabilidades Detectadas
+[Lista de vulnerabilidades encontradas con nivel de riesgo]
+
+## 📊 Análisis de Riesgo
+[Evaluación del impacto y probabilidad]
+
+## 🛡️ Recomendaciones Prioritarias
+[Acciones específicas para mitigar riesgos]
+
+## 📈 Medidas Preventivas
+[Estrategias para prevenir futuros incidentes]
+
+## 🔧 Análisis Adicional Recomendado
+[Herramientas de BlitzScan para análisis complementarios]
+
+TIPO DE ESCANEO: {scan_type}
+DATOS DEL ESCANEO:
 {scan_data}
+{context_info}
+
+Genera el reporte siguiendo el formato especificado con markdown.
 """
 
     try:
@@ -624,10 +765,10 @@ Consulta:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "Eres un asistente de ciberseguridad."},
+                {"role": "system", "content": "Eres BlitzScanIA, un asistente de ciberseguridad experto y profesional."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=400,
+            max_tokens=1000,
             temperature=0.7
         )
         report = response.choices[0].message.content

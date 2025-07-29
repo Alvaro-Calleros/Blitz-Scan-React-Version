@@ -92,25 +92,37 @@ const About = () => {
         <div className="mt-16 text-center">
           <div className="bg-blue-50 rounded-3xl p-8 border border-blue-200">
             <h3 className="text-3xl font-bold text-gray-900 mb-4">
-              ¿Listo para Fortalecer tu Seguridad?
+              ¿Listo para comenzar?
             </h3>
-            <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
-              Únete a miles de profesionales que confían en BLITZ SCAN para sus auditorías de seguridad.
+            <p className="text-lg text-gray-600 mb-8">
+              Únete a miles de profesionales que confían en BLITZ SCAN para proteger sus activos digitales.
             </p>
-            
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              {/* Botón Probar Aplicación solo si no está autenticado */}
-              {!isAuthenticated && (
-                <Link to="/register" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-lg px-8 py-4 rounded-xl transition-all duration-300">
-                  Probar Aplicación
+              {isAuthenticated ? (
+                <Link
+                  to="/scanner"
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-8 rounded-xl transition-all duration-300 text-lg"
+                >
+                  Comenzar Escaneo
+                </Link>
+              ) : (
+                <Link
+                  to="/register"
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-8 rounded-xl transition-all duration-300 text-lg"
+                >
+                  Registrarse Gratis
                 </Link>
               )}
-              <Link
-                to="/documentation"
-                className="border-2 border-blue-600 text-blue-600 bg-white hover:bg-blue-600 hover:text-white font-semibold text-lg px-8 py-4 rounded-xl transition-all duration-300"
+              <a 
+                href="#" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  setShowDocumentation(true);
+                }}
+                className="border-2 border-blue-600 text-blue-600 bg-white hover:bg-blue-600 hover:text-white font-semibold py-4 px-8 rounded-xl transition-all duration-300 text-lg"
               >
                 Ver Documentación
-              </Link>
+              </a>
             </div>
           </div>
         </div>

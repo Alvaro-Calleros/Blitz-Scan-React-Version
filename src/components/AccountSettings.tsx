@@ -95,35 +95,37 @@ export default function AccountSettings({ onClose }: { onClose: () => void }) {
             {profileImage ? (
               <img src={profileImage} alt="Foto de perfil" className="object-cover w-full h-full" />
             ) : (
-              <span className="text-4xl text-blue-400">+</span>
+              <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
             )}
           </div>
           <input
             type="file"
-            accept="image/*"
-            className="hidden"
             ref={fileInputRef}
             onChange={handleImageChange}
+            accept="image/*"
+            className="hidden"
           />
           <button
-            className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
             onClick={handleProfileImageUpdate}
-            disabled={loading || !imageFile}
+            disabled={!imageFile || loading}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg transition-colors"
           >
-            {loading ? 'Guardando...' : 'Guardar Foto'}
+            {loading ? 'Actualizando...' : 'Actualizar Foto'}
           </button>
-          <p className="text-xs text-gray-500 mt-1">Haz clic o arrastra una imagen para cambiar tu foto</p>
         </div>
+
         {/* Cambiar contraseña */}
-        <div className="mb-6">
+        <div className="border-t pt-6">
           <button
-            className="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded-lg font-semibold hover:bg-blue-100 transition mb-2"
-            onClick={() => setShowPasswordFields((v) => !v)}
+            onClick={() => setShowPasswordFields(!showPasswordFields)}
+            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition-colors mb-4"
           >
             Cambiar Contraseña
           </button>
           {showPasswordFields && (
-            <div className="mt-2 space-y-2 animate-fade-in">
+            <div className="space-y-4">
              <div className="relative">
                 <input
                   type={showOldPassword ? "text" : "password"}
@@ -184,15 +186,22 @@ export default function AccountSettings({ onClose }: { onClose: () => void }) {
               </div>
               <button
                 onClick={handlePasswordChange}
-                disabled={loading || !passwords.oldPassword || !passwords.newPassword}
-                className="btn-primary w-full mt-2"
+                disabled={!passwords.oldPassword || !passwords.newPassword || loading}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg transition-colors"
               >
-                {loading ? 'Guardando...' : 'Guardar Contraseña'}
+                {loading ? 'Actualizando...' : 'Actualizar Contraseña'}
               </button>
             </div>
           )}
         </div>
-        <button onClick={onClose} className="btn w-full mt-2">Cerrar</button>
+
+        {/* Botón cerrar */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl"
+        >
+          ×
+        </button>
       </div>
     </div>
   );

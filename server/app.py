@@ -95,74 +95,118 @@ def embellecer_subfinder(salida):
 # 🎯 Embellecedor de resultados HTTPX
 
 def embellecer_httpx(salida):
-    lines = [l.strip() for l in salida.splitlines() if l.strip()]
-    if not lines:
-        return '🔍 No se encontraron hosts vivos.'
-    salida_limpia = [f"🌐 Hosts vivos detectados: {len(lines)}"]
-    salida_limpia += [f"✅ {l}" for l in lines]
+    lineas = salida.splitlines()
+    dominios_vivos = [l.strip() for l in lineas if l.strip() and not l.startswith('[')]
+    if not dominios_vivos:
+        return '🔍 No se encontraron dominios vivos.'
+    salida_limpia = [f"🌐 Dominios vivos encontrados: {len(dominios_vivos)}"]
+    salida_limpia += [f"✅ {d}" for d in dominios_vivos]
     return '\n'.join(salida_limpia)
-
-# 🎯 Embellecedor de resultados NUCLEI
 
 def embellecer_nuclei(salida):
-    lines = [l.strip() for l in salida.splitlines() if l.strip()]
-    if not lines:
-        return '🔍 No se detectaron vulnerabilidades.'
-    salida_limpia = [f"🚨 Vulnerabilidades detectadas: {len(lines)}"]
-    salida_limpia += [f"⚠️ {l}" for l in lines]
+    lineas = salida.splitlines()
+    vulnerabilidades = [l.strip() for l in lineas if l.strip() and not l.startswith('[')]
+    if not vulnerabilidades:
+        return '🔍 No se encontraron vulnerabilidades.'
+    salida_limpia = [f"🚨 Vulnerabilidades encontradas: {len(vulnerabilidades)}"]
+    salida_limpia += [f"⚠️ {v}" for v in vulnerabilidades]
     return '\n'.join(salida_limpia)
-
-# 🎨 Embellecedor de resultados WhatWeb
 
 def embellecer_whatweb(salida):
-    lines = [l.strip() for l in salida.splitlines() if l.strip()]
-    if not lines:
-        return '🔍 No se detectó información con WhatWeb.'
-    salida_limpia = [f"🕵️‍♂️ WhatWeb - Información detectada:"]
-    salida_limpia += [f"✅ {l}" for l in lines]
-    return '\n'.join(salida_limpia)
-
-# 🎨 Embellecedor de resultados ParamSpider
+    if isinstance(salida, list):
+        techs = salida
+    else:
+        # Parsear la salida para extraer tecnologías y versiones
+        import re
+        m = re.search(r'\[\d{3} [A-Z]+\] (.+)', salida)
+        techs = []
+        if m:
+            techs_raw = m.group(1)
+            for t in techs_raw.split(','):
+                t = t.strip()
+                if not t:
+                    continue
+                # Extraer nombre y versión si existe
+                name_ver = re.match(r'([\w\-\s]+)(\[(.*?)\])?', t)
+                if name_ver:
+                    name = name_ver.group(1).strip()
+                    version = name_ver.group(3) if name_ver.group(3) else ''
+                    techs.append({'name': name, 'version': version})
+    
+    if not techs:
+        return '🔍 No se detectaron tecnologías.'
+    
+    # Agrupar por tipo básico usando keywords
+    categories = {
+        'CMS': ['WordPress', 'Drupal', 'Joomla'],
+        'Web Server': ['Apache', 'Nginx', 'LiteSpeed', 'HTTPServer'],
+        'Programming Language': ['PHP', 'Python', 'Django'],
+        'JS Framework': ['jQuery', 'React', 'Angular', 'Vue.js', 'Express.js'],
+        'CSS Framework': ['Bootstrap'],
+        'Analytics': ['Google Analytics'],
+        'CDN': ['Cloudflare'],
+        'Other': []
+    }
+    
+    techs_by_cat = {}
+    for cat, keywords in categories.items():
+        techs_by_cat[cat] = []
+        for tech in techs:
+            if any(keyword.lower() in tech['name'].lower() for keyword in keywords):
+                techs_by_cat[cat].append(tech)
+    
+    # Agrupar el resto en "Other"
+    for tech in techs:
+        if not any(tech in cat_techs for cat_techs in techs_by_cat.values()):
+            techs_by_cat['Other'].append(tech)
+    
+    # Limpiar categorías vacías
+    techs_by_cat = {k: v for k, v in techs_by_cat.items() if v}
+    
+    return techs_by_cat
 
 def embellecer_paramspider(salida):
-    lines = [l.strip() for l in salida.splitlines() if l.strip() and not l.startswith('[INFO]')]
-    if not lines:
-        return '🔍 No se detectaron parámetros con ParamSpider.'
-    salida_limpia = [f"🕷️ ParamSpider - Parámetros encontrados:"]
-    salida_limpia += [f"✅ {l}" for l in lines]
+    parametros = [l.strip() for l in salida.splitlines() if l.strip() and not l.startswith('[-]')]
+    if not parametros:
+        return '🔍 No se encontraron parámetros.'
+    salida_limpia = [f"🕷️ Parámetros encontrados: {len(parametros)}"]
+    salida_limpia += [f"✅ {p}" for p in parametros]
     return '\n'.join(salida_limpia)
-
-# 🎨 Embellecedor de resultados theHarvester
 
 def embellecer_theharvester(salida):
-    lines = [l.strip() for l in salida.splitlines() if l.strip()]
-    if not lines:
-        return '🔍 No se detectó información con theHarvester.'
-    salida_limpia = [f"🔎 theHarvester - Resultados:"]
-    salida_limpia += [f"✅ {l}" for l in lines]
+    emails = [l.strip() for l in salida.splitlines() if '@' in l and not l.startswith('[-]')]
+    hosts = [l.strip() for l in salida.splitlines() if '.' in l and '@' not in l and not l.startswith('[-]')]
+    if not emails and not hosts:
+        return '🔍 No se encontraron emails ni hosts.'
+    salida_limpia = []
+    if emails:
+        salida_limpia.append(f"📧 Emails encontrados: {len(emails)}")
+        salida_limpia += [f"✅ {e}" for e in emails]
+    if hosts:
+        salida_limpia.append(f"🌐 Hosts encontrados: {len(hosts)}")
+        salida_limpia += [f"✅ {h}" for h in hosts]
     return '\n'.join(salida_limpia)
 
-# 🛰 Escaneo con Nmap
 @app.route('/escanear', methods=['POST'])
 def escanear_nmap():
     objetivo = limpiar_objetivo(request.get_json().get('objetivo', ''))
-
     if not objetivo:
         return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
-
     try:
-        print(f"Ejecutando Nmap para: {objetivo}")  
         resultado = subprocess.check_output([
-            r'C:\Program Files (x86)\Nmap\nmap.exe', '-F', objetivo
-        ], text=True)
+            'nmap',
+            '-sS',
+            '-sV',
+            '-O',
+            '-p-',
+            objetivo
+        ], text=True, stderr=subprocess.STDOUT)
         salida = embellecer_nmap(resultado)
     except subprocess.CalledProcessError as e:
-        salida = f"❌ Error al ejecutar Nmap:\n{e.output}"
+        return jsonify({'resultado': f'❌ Error en Nmap:\n{e.output}'}), 500
     except Exception as e:
-        salida = f"❌ Error inesperado:\n{str(e)}"
-
+        return jsonify({'resultado': f'❌ Error inesperado:\n{str(e)}'}), 500
     return jsonify({'resultado': salida})
-
 
 @app.route('/dir', methods=['POST'])
 def escanear_directorios():
@@ -493,59 +537,126 @@ def escanear_httpx():
         return jsonify({'resultado': f'❌ Error inesperado:\n{str(e)}'}), 500
     return jsonify({'resultado': salida})
 
-# 🕵️‍♂️ WhatWeb
+# 🕵️‍♂️ WhatWeb (Python-based)
 @app.route('/whatweb', methods=['POST'])
 def escanear_whatweb():
     objetivo = limpiar_objetivo(request.get_json().get('objetivo', ''))
     if not objetivo:
         return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
     try:
-        resultado = subprocess.check_output([
-            r'C:\Ruby34-x64\bin\ruby.exe',
-            os.path.join(WHATWEB_PATH, 'whatweb'),
-            f'https://{objetivo}'
-        ], text=True, stderr=subprocess.STDOUT, cwd=WHATWEB_PATH)
-        # Parsear la salida para extraer tecnologías y versiones
-        # Ejemplo: https://upsin.edu.mx [200 OK] Bootstrap[6.8.2], Frame, HTML5, HTTPServer[LiteSpeed], ...
+        import requests
+        from bs4 import BeautifulSoup
         import re
-        m = re.search(r'\[\d{3} [A-Z]+\] (.+)', resultado)
+        
+        url = f'https://{objetivo}'
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        html_content = response.text
+        soup = BeautifulSoup(html_content, 'html.parser')
+        
         techs = []
-        if m:
-            techs_raw = m.group(1)
-            for t in techs_raw.split(','):
-                t = t.strip()
-                if not t:
-                    continue
-                # Extraer nombre y versión si existe
-                name_ver = re.match(r'([\w\-\s]+)(\[(.*?)\])?', t)
-                if name_ver:
-                    name = name_ver.group(1).strip()
-                    version = name_ver.group(3) if name_ver.group(3) else ''
-                    techs.append({'name': name, 'version': version})
+        
+        # Detectar tecnologías basadas en headers
+        server = response.headers.get('Server', '')
+        if server:
+            techs.append({'name': server, 'version': ''})
+        
+        # Detectar tecnologías basadas en HTML
+        # WordPress
+        if 'wp-content' in html_content or 'wp-includes' in html_content:
+            techs.append({'name': 'WordPress', 'version': ''})
+        
+        # jQuery
+        jquery_match = re.search(r'jquery[.-](\d+\.\d+\.\d+)', html_content.lower())
+        if jquery_match:
+            techs.append({'name': 'jQuery', 'version': jquery_match.group(1)})
+        elif 'jquery' in html_content.lower():
+            techs.append({'name': 'jQuery', 'version': ''})
+        
+        # Bootstrap
+        bootstrap_match = re.search(r'bootstrap[.-](\d+\.\d+\.\d+)', html_content.lower())
+        if bootstrap_match:
+            techs.append({'name': 'Bootstrap', 'version': bootstrap_match.group(1)})
+        elif 'bootstrap' in html_content.lower():
+            techs.append({'name': 'Bootstrap', 'version': ''})
+        
+        # React
+        if 'react' in html_content.lower() or 'reactjs' in html_content.lower():
+            techs.append({'name': 'React', 'version': ''})
+        
+        # Angular
+        if 'ng-' in html_content or 'angular' in html_content.lower():
+            techs.append({'name': 'Angular', 'version': ''})
+        
+        # Vue.js
+        if 'vue' in html_content.lower():
+            techs.append({'name': 'Vue.js', 'version': ''})
+        
+        # PHP
+        if 'php' in html_content.lower() or '.php' in html_content:
+            techs.append({'name': 'PHP', 'version': ''})
+        
+        # Python/Django
+        if 'django' in html_content.lower() or 'csrfmiddlewaretoken' in html_content:
+            techs.append({'name': 'Django', 'version': ''})
+        
+        # Node.js/Express
+        if 'express' in html_content.lower():
+            techs.append({'name': 'Express.js', 'version': ''})
+        
+        # Google Analytics
+        if 'google-analytics' in html_content.lower() or 'gtag' in html_content.lower():
+            techs.append({'name': 'Google Analytics', 'version': ''})
+        
+        # Cloudflare
+        if 'cloudflare' in html_content.lower():
+            techs.append({'name': 'Cloudflare', 'version': ''})
+        
+        # Meta tags
+        meta_tags = soup.find_all('meta')
+        for tag in meta_tags:
+            name = tag.get('name', '').lower()
+            content = tag.get('content', '').lower()
+            
+            if 'generator' in name:
+                techs.append({'name': content.title(), 'version': ''})
+            elif 'framework' in name:
+                techs.append({'name': content.title(), 'version': ''})
+        
         # Agrupar por tipo básico usando keywords
         categories = {
             'CMS': ['WordPress', 'Drupal', 'Joomla'],
             'Web Server': ['Apache', 'Nginx', 'LiteSpeed', 'HTTPServer'],
-            'Programming Language': ['PHP', 'Python', 'Ruby', 'Perl'],
-            'JS Framework': ['jQuery', 'React', 'Angular', 'Vue'],
-            'Analytics': ['Google Analytics', 'Piwik', 'Hotjar'],
-            'Operating System': ['Ubuntu', 'Linux', 'Windows'],
+            'Programming Language': ['PHP', 'Python', 'Django'],
+            'JS Framework': ['jQuery', 'React', 'Angular', 'Vue.js', 'Express.js'],
+            'CSS Framework': ['Bootstrap'],
+            'Analytics': ['Google Analytics'],
             'CDN': ['Cloudflare'],
             'Other': []
         }
-        techs_by_cat = {k: [] for k in categories}
-        for tech in techs:
-            found = False
-            for cat, keys in categories.items():
-                if any(key.lower() in tech['name'].lower() for key in keys):
+        
+        techs_by_cat = {}
+        for cat, keywords in categories.items():
+            techs_by_cat[cat] = []
+            for tech in techs:
+                if any(keyword.lower() in tech['name'].lower() for keyword in keywords):
                     techs_by_cat[cat].append(tech)
-                    found = True
-                    break
-            if not found:
+        
+        # Agrupar el resto en "Other"
+        for tech in techs:
+            if not any(tech in cat_techs for cat_techs in techs_by_cat.values()):
                 techs_by_cat['Other'].append(tech)
+        
+        # Limpiar categorías vacías
+        techs_by_cat = {k: v for k, v in techs_by_cat.items() if v}
+        
         return jsonify({'resultado': techs_by_cat})
-    except subprocess.CalledProcessError as e:
-        return jsonify({'resultado': f'❌ Error en WhatWeb:\n{e.output}'}), 500
+        
+    except requests.exceptions.RequestException as e:
+        return jsonify({'resultado': f'❌ Error de conexión:\n{str(e)}'}), 500
     except Exception as e:
         return jsonify({'resultado': f'❌ Error inesperado:\n{str(e)}'}), 500
 
@@ -557,27 +668,27 @@ def escanear_paramspider():
         return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
     try:
         resultado = subprocess.check_output([
-            'py', '-m', 'paramspider.main', '--domain', objetivo
-        ], text=True, stderr=subprocess.STDOUT, cwd=PARAMSPIDER_PATH)
+            'python', '-m', 'paramspider.main', '--domain', objetivo
+        ], text=True, stderr=subprocess.STDOUT, cwd=r'C:\Users\alvar\Desktop\BLITZ_SCAN\Blitz-Scan-React-Version\ParamSpider')
         # Buscar el archivo de resultados generado
-        results_dir = os.path.join(PARAMSPIDER_PATH, 'results')
-        pattern = os.path.join(results_dir, f'{objetivo}*.txt')
-        files = glob.glob(pattern)
-        if files:
-            with open(files[0], 'r', encoding='utf-8', errors='ignore') as f:
-                params = [line.strip() for line in f if line.strip()]
-            salida = '🕷️ ParamSpider - Parámetros encontrados:\n' + '\n'.join(f'✅ {p}' for p in params[:50])
-            if len(params) > 50:
-                salida += f"\n... y {len(params)-50} más."
+        results_dir = os.path.join(r'C:\Users\alvar\Desktop\BLITZ_SCAN\Blitz-Scan-React-Version\ParamSpider', 'results')
+        if os.path.exists(results_dir):
+            result_files = glob.glob(os.path.join(results_dir, f'*{objetivo}*.txt'))
+            if result_files:
+                with open(result_files[0], 'r') as f:
+                    contenido = f.read()
+                salida = embellecer_paramspider(contenido)
+            else:
+                salida = embellecer_paramspider(resultado)
         else:
-            salida = '🔍 No se encontraron parámetros en el archivo de resultados.'
-        return jsonify({'resultado': salida})
+            salida = embellecer_paramspider(resultado)
     except subprocess.CalledProcessError as e:
         return jsonify({'resultado': f'❌ Error en ParamSpider:\n{e.output}'}), 500
     except Exception as e:
         return jsonify({'resultado': f'❌ Error inesperado:\n{str(e)}'}), 500
+    return jsonify({'resultado': salida})
 
-# 🔎 theHarvester
+# 🌾 theHarvester
 @app.route('/theharvester', methods=['POST'])
 def escanear_theharvester():
     objetivo = limpiar_objetivo(request.get_json().get('objetivo', ''))
@@ -585,73 +696,14 @@ def escanear_theharvester():
         return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
     try:
         resultado = subprocess.check_output([
-            'py', '-m', 'theHarvester', '-d', objetivo, '-b', 'all'
-        ], text=True, stderr=subprocess.STDOUT)
-        # Parser robusto por bloques
-        correos = []
-        hosts = []
-        asns = []
-        urls = []
-        lines = resultado.splitlines()
-        i = 0
-        while i < len(lines):
-            line = lines[i].strip()
-            # Emails block
-            if line.startswith('[*] Emails found:'):
-                i += 1
-                while i < len(lines) and (lines[i].strip() == '' or lines[i].startswith('-')):
-                    i += 1
-                while i < len(lines) and lines[i].strip() and not lines[i].startswith('['):
-                    correos.append(lines[i].strip())
-                    i += 1
-            # Hosts block
-            elif line.startswith('[*] Hosts found:'):
-                i += 1
-                while i < len(lines) and (lines[i].strip() == '' or lines[i].startswith('-')):
-                    i += 1
-                while i < len(lines) and lines[i].strip() and not lines[i].startswith('['):
-                    hosts.append(lines[i].strip())
-                    i += 1
-            # ASNS block
-            elif line.startswith('[*] ASNS found:'):
-                i += 1
-                while i < len(lines) and (lines[i].strip() == '' or lines[i].startswith('-')):
-                    i += 1
-                while i < len(lines) and lines[i].strip() and not lines[i].startswith('['):
-                    asns.append(lines[i].strip())
-                    i += 1
-            # Interesting URLs block
-            elif line.startswith('[*] Interesting Urls found:'):
-                i += 1
-                while i < len(lines) and (lines[i].strip() == '' or lines[i].startswith('-')):
-                    i += 1
-                while i < len(lines) and lines[i].strip() and not lines[i].startswith('['):
-                    urls.append(lines[i].strip())
-                    i += 1
-            else:
-                i += 1
-        # Fallback: regex si no se detectan bloques
-        import re
-        if not correos:
-            correos = list(set(re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', resultado)))
-        if not hosts:
-            hosts = list(set(re.findall(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b', resultado)))
-        salida = '🔎 theHarvester - Resultados organizados:\n'
-        salida += f"\n📧 Correos encontrados ({len(correos)}):\n" + '\n'.join(correos[:20])
-        if len(correos) > 20:
-            salida += f"\n... y {len(correos)-20} más."
-        salida += f"\n\n🌐 Hosts/IPs encontrados ({len(hosts)}):\n" + '\n'.join(hosts[:20])
-        if len(hosts) > 20:
-            salida += f"\n... y {len(hosts)-20} más."
-        if asns:
-            salida += f"\n\n🔢 ASNs encontrados ({len(asns)}):\n" + '\n'.join(asns)
-        if urls:
-            salida += f"\n\n🔗 URLs interesantes encontradas ({len(urls)}):\n" + '\n'.join(urls)
-        return jsonify({'resultado': salida, 'raw': resultado})
+            'python', 'theHarvester.py', '-d', objetivo, '-b', 'all'
+        ], text=True, stderr=subprocess.STDOUT, cwd=r'C:\Users\alvar\Desktop\BLITZ_SCAN\Blitz-Scan-React-Version\theHarvester')
+        salida = embellecer_theharvester(resultado)
     except subprocess.CalledProcessError as e:
-        return jsonify({'resultado': f'❌ Error en theHarvester:\n{e.output}', 'raw': e.output}), 500
+        return jsonify({'resultado': f'❌ Error en theHarvester:\n{e.output}'}), 500
     except Exception as e:
-        return jsonify({'resultado': f'❌ Error inesperado:\n{str(e)}', 'raw': str(e)}), 500
+        return jsonify({'resultado': f'❌ Error inesperado:\n{str(e)}'}), 500
+    return jsonify({'resultado': salida})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=3001)

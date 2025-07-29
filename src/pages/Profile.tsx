@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getAllScans, getScanById, Scan } from '../utils/scanUtils';
 import { toast } from 'sonner';
+import ReactMarkdown from 'react-markdown';
 import Navbar from '../components/Navbar';
 import AccountSettings from '../components/AccountSettings';
 
@@ -17,6 +18,10 @@ const Profile = () => {
   const [detailModalContent, setDetailModalContent] = useState<any>(null);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportModalContent, setReportModalContent] = useState<any>(null);
+  const [showGenerateReportModal, setShowGenerateReportModal] = useState(false);
+  const [selectedScanForReport, setSelectedScanForReport] = useState<Scan | null>(null);
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [scansWithReports, setScansWithReports] = useState<Set<string>>(new Set());
 
   if (!isAuthenticated) {
     navigate('/login');
@@ -29,6 +34,16 @@ const Profile = () => {
         try {
           const allScans = await getAllScans(parseInt(user.id));
           setScans(allScans);
+          
+          // Verificar qué escaneos tienen reporte
+          const reportsSet = new Set<string>();
+          for (const scan of allScans) {
+            const hasReport = await checkScanHasReport(scan.id);
+            if (hasReport) {
+              reportsSet.add(scan.id);
+            }
+          }
+          setScansWithReports(reportsSet);
         } catch (error) {
           toast.error('Error al cargar el historial de escaneos');
         }
@@ -73,6 +88,14 @@ const Profile = () => {
       endpoint = `http://localhost:3001/api/get-nmap-scans/${user?.id}`;
     } else if (scan.scan_type === 'fuzzing') {
       endpoint = `http://localhost:3001/api/get-fuzzing-scans/${user?.id}`;
+    } else if (scan.scan_type === 'subfinder') {
+      endpoint = `http://localhost:3001/api/get-subfinder-scans/${user?.id}`;
+    } else if (scan.scan_type === 'paramspider') {
+      endpoint = `http://localhost:3001/api/get-paramspider-scans/${user?.id}`;
+    } else if (scan.scan_type === 'whatweb') {
+      endpoint = `http://localhost:3001/api/get-whatweb-scans/${user?.id}`;
+    } else if (scan.scan_type === 'theharvester') {
+      endpoint = `http://localhost:3001/api/get-theharvester-scans/${user?.id}`;
     } else {
       toast.error('Tipo de escaneo no soportado');
       return;
@@ -104,7 +127,40 @@ const Profile = () => {
       const res = await fetch(`http://localhost:3001/api/get-report/${scan.id}`);
       const data = await res.json();
       if (data.success && data.reporte) {
-        setReportModalContent(data.reporte);
+        // Extraer solo el contenido del reporte, no el JSON completo
+        let reportContent = data.reporte;
+        
+        // Si el reporte viene como JSON string, intentar parsearlo
+        if (typeof reportContent === 'string') {
+          try {
+            const parsed = JSON.parse(reportContent);
+            // Si tiene la propiedad 'reporte', usar esa
+            if (parsed.reporte) {
+              reportContent = parsed.reporte;
+            } else if (parsed.report) {
+              // También verificar si tiene 'report'
+              reportContent = parsed.report;
+            } else {
+              // Si no tiene propiedades específicas, usar el contenido completo
+              reportContent = reportContent;
+            }
+          } catch (e) {
+            // Si no es JSON válido, usar el string tal como viene
+            reportContent = reportContent;
+          }
+        } else if (typeof reportContent === 'object') {
+          // Si ya es un objeto, buscar la propiedad correcta
+          if (reportContent.reporte) {
+            reportContent = reportContent.reporte;
+          } else if (reportContent.report) {
+            reportContent = reportContent.report;
+          } else {
+            // Si no encuentra propiedades específicas, convertir a string
+            reportContent = JSON.stringify(reportContent, null, 2);
+          }
+        }
+        
+        setReportModalContent(reportContent);
         setShowReportModal(true);
         toast.success('Reporte extraído.');
       } else {
@@ -113,6 +169,122 @@ const Profile = () => {
     } catch (error) {
       toast.error('Error al obtener el reporte');
       console.error(error);
+    }
+  };
+
+  // Nueva función para verificar si un escaneo tiene reporte
+  const checkScanHasReport = async (scanId: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`http://localhost:3001/api/get-report/${scanId}`);
+      const data = await res.json();
+      return data.success && data.reporte;
+    } catch (error) {
+      return false;
+    }
+  };
+
+  // Nueva función para generar reporte
+  const handleGenerateReport = async (scan: Scan) => {
+    setSelectedScanForReport(scan);
+    setShowGenerateReportModal(true);
+  };
+
+  // Función para ejecutar la generación del reporte
+  const executeReportGeneration = async () => {
+    if (!selectedScanForReport || !user?.id) return;
+    
+    setGeneratingReport(true);
+    try {
+      // Obtener los datos del escaneo
+      let scanData: any = null;
+      let endpoint = '';
+      
+      if (selectedScanForReport.scan_type === 'whois') {
+        endpoint = `http://localhost:3001/api/get-whois-scans/${user.id}`;
+      } else if (selectedScanForReport.scan_type === 'nmap') {
+        endpoint = `http://localhost:3001/api/get-nmap-scans/${user.id}`;
+      } else if (selectedScanForReport.scan_type === 'fuzzing') {
+        endpoint = `http://localhost:3001/api/get-fuzzing-scans/${user.id}`;
+      } else if (selectedScanForReport.scan_type === 'subfinder') {
+        endpoint = `http://localhost:3001/api/get-subfinder-scans/${user.id}`;
+      } else if (selectedScanForReport.scan_type === 'paramspider') {
+        endpoint = `http://localhost:3001/api/get-paramspider-scans/${user.id}`;
+      } else if (selectedScanForReport.scan_type === 'whatweb') {
+        endpoint = `http://localhost:3001/api/get-whatweb-scans/${user.id}`;
+      } else if (selectedScanForReport.scan_type === 'theharvester') {
+        endpoint = `http://localhost:3001/api/get-theharvester-scans/${user.id}`;
+      }
+
+      if (endpoint) {
+        const res = await fetch(endpoint);
+        const data = await res.json();
+        let detalle = null;
+        if (Array.isArray(data.scans)) {
+          detalle = data.scans.find((s: any) => String(s.id) === String(selectedScanForReport.id));
+        }
+        scanData = detalle;
+      }
+
+      // Preparar contexto del escaneo
+      const scanContext = {
+        currentScan: {
+          type: selectedScanForReport.scan_type,
+          url: selectedScanForReport.url,
+          timestamp: selectedScanForReport.timestamp,
+          data: scanData
+        },
+        conversationHistory: [],
+        userExpertise: 'intermediate',
+        focusArea: 'web_security',
+        previousTopics: []
+      };
+
+      // Generar el reporte
+      const reportRes = await fetch('http://localhost:3001/generate_report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          scan_type: selectedScanForReport.scan_type, 
+          scan_data: typeof scanData === 'string' ? scanData : JSON.stringify(scanData),
+          context: scanContext
+        })
+      });
+      
+      const reportData = await reportRes.json();
+      
+      if (reportData.report) {
+        // Guardar el reporte
+        const saveRes = await fetch('http://localhost:3001/api/save-report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id,
+            scanId: selectedScanForReport.id,
+            reportText: reportData.report
+          })
+        });
+        
+        const saveData = await saveRes.json();
+        
+        if (saveData.success) {
+          toast.success('Reporte generado y guardado exitosamente');
+          // Usar directamente el contenido del reporte, no el JSON completo
+          setReportModalContent(reportData.report);
+          setShowGenerateReportModal(false);
+          setShowReportModal(true);
+          // Actualizar el estado para mostrar que este escaneo ahora tiene reporte
+          setScansWithReports(prev => new Set([...prev, selectedScanForReport.id]));
+        } else {
+          toast.error('Error al guardar el reporte');
+        }
+      } else {
+        toast.error('No se pudo generar el reporte');
+      }
+    } catch (error) {
+      toast.error('Error al generar el reporte');
+      console.error(error);
+    } finally {
+      setGeneratingReport(false);
     }
   };
 
@@ -144,7 +316,11 @@ const Profile = () => {
     const icons: { [key: string]: string } = {
       fuzzing: '🔍',
       nmap: '🌐',
-      whois: '📋'
+      whois: '📋',
+      subfinder: '🔎',
+      paramspider: '🕷️',
+      whatweb: '🕵️‍♂️',
+      theharvester: '🌾'
     };
     return icons[type] || '🔧';
   };
@@ -232,14 +408,6 @@ const Profile = () => {
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center space-x-3">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs border ${getStatusColor(scan.status)}`}>
-                              {scan.status === 'completed' && 'Completado'}
-                              {scan.status === 'running' && 'En progreso'}
-                              {scan.status === 'failed' && 'Fallido'}
-                            </span>
-                            <span className="text-gray-500 text-sm">{scan.results?.length || 0} resultados</span>
-                          </div>
                         </div>
                         {selectedScan?.id === scan.id && (
                           <div className="mt-6 pt-6 border-t border-gray-200 flex gap-3">
@@ -255,11 +423,18 @@ const Profile = () => {
                             <button
                               onClick={e => {
                                 e.stopPropagation();
-                                handleShowReport(scan);
+                                // Verificar si tiene reporte y mostrar el botón correspondiente
+                                checkScanHasReport(scan.id).then(hasReport => {
+                                  if (hasReport) {
+                                    handleShowReport(scan);
+                                  } else {
+                                    handleGenerateReport(scan);
+                                  }
+                                });
                               }}
                               className="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300"
                             >
-                              Ver Reporte
+                              {scansWithReports.has(scan.id) ? 'Ver Reporte' : 'Generar Reporte'}
                             </button>
                             <button
                               onClick={e => {
@@ -364,25 +539,122 @@ const Profile = () => {
       {/* Modal de reporte IA */}
       {showReportModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-8 relative animate-fadeInUp">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full p-8 relative animate-fadeInUp max-h-[90vh] overflow-hidden flex flex-col">
             <button
               onClick={() => setShowReportModal(false)}
-              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl font-bold"
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl font-bold z-10"
               aria-label="Cerrar reporte"
             >
               ×
             </button>
-            <h2 className="text-2xl font-bold mb-4 text-green-700 flex items-center gap-2">
-              🧠 Reporte IA Generado
-            </h2>
-            <pre className="bg-gray-100 rounded-lg p-4 text-sm max-h-96 overflow-auto whitespace-pre-wrap">
-              {typeof reportModalContent === 'string' ? reportModalContent : JSON.stringify(reportModalContent, null, 2)}
-            </pre>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-blue-500 rounded-xl flex items-center justify-center">
+                <span className="text-white text-2xl">🧠</span>
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Reporte IA Generado</h2>
+                <p className="text-gray-600 text-sm">Análisis de seguridad con inteligencia artificial</p>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto bg-gray-50 rounded-xl p-6">
+              <ReactMarkdown 
+                components={{
+                  h1: ({children}) => <h1 className="text-2xl font-bold text-gray-900 mb-4 mt-6 first:mt-0">{children}</h1>,
+                  h2: ({children}) => <h2 className="text-xl font-bold text-gray-800 mb-3 mt-5">{children}</h2>,
+                  h3: ({children}) => <h3 className="text-lg font-semibold text-gray-800 mb-2 mt-4">{children}</h3>,
+                  p: ({children}) => <p className="text-gray-700 mb-3 leading-relaxed">{children}</p>,
+                  strong: ({children}) => <strong className="font-bold text-gray-900">{children}</strong>,
+                  em: ({children}) => <em className="italic text-gray-800">{children}</em>,
+                  code: ({children}) => <code className="bg-gray-200 px-2 py-1 rounded text-sm font-mono text-gray-800">{children}</code>,
+                  pre: ({children}) => <pre className="bg-gray-200 p-4 rounded-lg text-sm overflow-x-auto mb-4">{children}</pre>,
+                  ul: ({children}) => <ul className="list-disc list-inside space-y-2 mb-4 text-gray-700">{children}</ul>,
+                  ol: ({children}) => <ol className="list-decimal list-inside space-y-2 mb-4 text-gray-700">{children}</ol>,
+                  li: ({children}) => <li className="text-gray-700">{children}</li>,
+                  blockquote: ({children}) => <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-600 mb-4">{children}</blockquote>,
+                  table: ({children}) => <div className="overflow-x-auto mb-4"><table className="min-w-full border border-gray-300">{children}</table></div>,
+                  th: ({children}) => <th className="border border-gray-300 px-4 py-2 bg-gray-100 font-semibold text-left">{children}</th>,
+                  td: ({children}) => <td className="border border-gray-300 px-4 py-2">{children}</td>,
+                }}
+              >
+                {typeof reportModalContent === 'string' ? reportModalContent : 'Contenido del reporte no disponible en formato legible.'}
+              </ReactMarkdown>
+            </div>
+            <div className="mt-6 pt-4 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  const content = typeof reportModalContent === 'string' ? reportModalContent : JSON.stringify(reportModalContent, null, 2);
+                  navigator.clipboard.writeText(content);
+                  toast.success('Reporte copiado al portapapeles');
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+              >
+                📋 Copiar Reporte
+              </button>
+              <button
+                onClick={() => setShowReportModal(false)}
+                className="bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-2 px-4 rounded-lg transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}
       {showAccountSettings && (
         <AccountSettings onClose={() => setShowAccountSettings(false)} />
+      )}
+      
+      {/* Modal para generar reporte */}
+      {showGenerateReportModal && selectedScanForReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 relative animate-fadeInUp">
+            <button
+              onClick={() => setShowGenerateReportModal(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl font-bold"
+              aria-label="Cerrar modal"
+            >
+              ×
+            </button>
+            <div className="text-center">
+              <div className="w-16 h-16 bg-blue-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+                <span className="text-2xl">🧠</span>
+              </div>
+              <h2 className="text-2xl font-bold mb-4 text-blue-700">
+                Generar Reporte IA
+              </h2>
+              <p className="text-gray-600 mb-6">
+                ¿Deseas generar un reporte de seguridad con IA para el escaneo de{' '}
+                <span className="font-semibold">{selectedScanForReport.url}</span>?
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowGenerateReportModal(false)}
+                  className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-3 px-6 rounded-xl transition-all duration-300"
+                  disabled={generatingReport}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={executeReportGeneration}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 flex items-center justify-center"
+                  disabled={generatingReport}
+                >
+                  {generatingReport ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Generando...
+                    </>
+                  ) : (
+                    'Generar Reporte'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

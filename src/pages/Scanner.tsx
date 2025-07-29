@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import ReactMarkdown from 'react-markdown';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import WhoisResult from '../components/WhoisResult';
@@ -13,6 +14,7 @@ import { ChartContainer } from '../components/ui/chart';
 import * as RechartsPrimitive from 'recharts';
 import ChatbotModal from '../components/ChatbotModal';
 import { generatePDFReport, generateScanId, Scan, ScanResult, scanFuzzing, scanNmap, scanWhois, saveWhoisScan, saveNmapScan, saveFuzzingScan } from '../utils/scanUtils';
+import { processAIQuery, AIQueryType, getContextualSuggestions } from '../utils/blitzScanAI';
 
 // Extender Scan para incluir rawHarvester opcional si no está en la interfaz global
 // (esto es solo para TypeScript, no afecta la lógica)
@@ -23,8 +25,6 @@ const Scanner = () => {
   const [scanType, setScanType] = useState('fuzzing');
   const [isScanning, setIsScanning] = useState(false);
   const [currentScan, setCurrentScan] = useState<ScanWithHarvester | null>(null);
-  const [showScrollTop, setShowScrollTop] = useState(false);
-  const [showScrollBottom, setShowScrollBottom] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -38,6 +38,10 @@ const Scanner = () => {
   const [chatbotLoading, setChatbotLoading] = useState(false);
   const [chatInput, setChatInput] = useState(''); // Para el input del chat flotante
   const [dbScanId, setDbScanId] = useState<number | null>(null);
+  const [isReportGenerated, setIsReportGenerated] = useState(false); // Para saber si se generó un reporte
+  const [currentQueryType, setCurrentQueryType] = useState<AIQueryType>('general_chat'); // Tipo de consulta actual
+  const [aiCollapsed, setAiCollapsed] = useState(false); // Para colapsar/expandir la IA
+  const [aiMinimized, setAiMinimized] = useState(true); // Para minimizar/maximizar la IA
 
   // Nuevo: estado para categoría seleccionada
   const scanCategories = [
@@ -80,32 +84,89 @@ const Scanner = () => {
   }, [selectedCategory]);
 
   useEffect(() => {
-    if (currentScan && currentScan.status !== 'running' && resultRef.current) {
-      resultRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!isAuthenticated) {
+      navigate('/login');
     }
-  }, [currentScan]);
+  }, [isAuthenticated, navigate]);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      const scrollHeight = document.documentElement.scrollHeight;
-      const windowHeight = window.innerHeight;
-      const isNearTop = scrollTop < 200;
-      const isNearBottom = scrollTop > (scrollHeight - windowHeight - 200);
+  // Función para manejar el envío de mensajes al chatbot
+  const handleSendMessage = async (message: string) => {
+    if (!message.trim()) return;
+
+    // Agregar mensaje del usuario
+    const userMessage = { sender: 'user' as const, text: message };
+    setChatbotMessages(prev => [...prev, userMessage]);
+    setChatInput('');
+
+    // Determinar el tipo de consulta
+    let queryType: AIQueryType = 'general_chat';
+    if (currentScan) {
+      queryType = 'scan_analysis';
+    } else if (message.toLowerCase().includes('reporte') || message.toLowerCase().includes('análisis')) {
+      queryType = 'report_generation';
+    }
+
+    setCurrentQueryType(queryType);
+    setChatbotLoading(true);
+
+    try {
+      // Procesar la consulta con IA
+      const response = await processAIQuery(message, queryType, currentScan);
       
-      setShowScrollTop(!isNearTop && currentScan && currentScan.status === 'completed');
-      setShowScrollBottom(isNearTop && currentScan && currentScan.status === 'completed');
-    };
+      // Agregar respuesta del bot
+      const botMessage = { sender: 'bot' as const, text: response };
+      setChatbotMessages(prev => [...prev, botMessage]);
+      
+      // Si se generó un reporte, marcar como tal
+      if (queryType === 'report_generation') {
+        setIsReportGenerated(true);
+      }
+    } catch (error) {
+      console.error('Error al procesar consulta:', error);
+      const errorMessage = { sender: 'bot' as const, text: 'Lo siento, hubo un error al procesar tu consulta. Por favor, intenta de nuevo.' };
+      setChatbotMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setChatbotLoading(false);
+    }
+  };
 
-    window.addEventListener('scroll', handleScroll);
-    handleScroll(); // Ejecutar una vez al montar
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [currentScan]);
+  // Función para guardar el reporte generado
+  const handleSaveReport = async (reportText: string) => {
+    if (!user?.id || !currentScan) {
+      toast.error('No se puede guardar el reporte');
+      return;
+    }
 
-  if (!isAuthenticated) {
-    navigate('/login');
-    return null;
-  }
+    try {
+      const res = await fetch('http://localhost:3001/api/save-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          scanId: currentScan.id,
+          reportText: reportText
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Reporte guardado exitosamente');
+        setScanSaved(true);
+      } else {
+        toast.error('Error al guardar el reporte');
+      }
+    } catch (error) {
+      console.error('Error al guardar reporte:', error);
+      toast.error('Error al guardar el reporte');
+    }
+  };
+
+  // Función para cerrar el chatbot
+  const handleCloseAI = () => {
+    setChatbotOpen(false);
+    setChatbotMessages([]);
+    setIsReportGenerated(false);
+  };
 
   const handleScan = async () => {
     if (!url.trim()) {
@@ -212,6 +273,54 @@ const Scanner = () => {
       response = await saveNmapScan(currentScan, parseInt(user.id));
     } else if (currentScan.scan_type === 'fuzzing') {
       response = await saveFuzzingScan(currentScan, parseInt(user.id));
+    } else if (currentScan.scan_type === 'subfinder') {
+      response = await fetch('http://localhost:3001/api/save-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          url: currentScan.url,
+          scanType: 'subfinder',
+          subfinderData: currentScan.extraResult,
+          estado: 'completado'
+        })
+      }).then(res => res.json());
+    } else if (currentScan.scan_type === 'paramspider') {
+      response = await fetch('http://localhost:3001/api/save-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          url: currentScan.url,
+          scanType: 'paramspider',
+          paramspiderData: currentScan.extraResult,
+          estado: 'completado'
+        })
+      }).then(res => res.json());
+    } else if (currentScan.scan_type === 'whatweb') {
+      response = await fetch('http://localhost:3001/api/save-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          url: currentScan.url,
+          scanType: 'whatweb',
+          whatwebData: currentScan.extraResult,
+          estado: 'completado'
+        })
+      }).then(res => res.json());
+    } else if (currentScan.scan_type === 'theharvester') {
+      response = await fetch('http://localhost:3001/api/save-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          url: currentScan.url,
+          scanType: 'theharvester',
+          theHarvesterData: currentScan.extraResult,
+          estado: 'completado'
+        })
+      }).then(res => res.json());
     }
     if (response && response.success) {
       if (response.scan_id) setDbScanId(response.scan_id);
@@ -262,6 +371,7 @@ const Scanner = () => {
           ...prev,
           { sender: 'bot', text: reportData.report }
         ]);
+        setIsReportGenerated(true); // Marcar que se generó un reporte
       } else {
         setChatbotMessages(prev => [
           ...prev,
@@ -304,37 +414,11 @@ const Scanner = () => {
     }
   };
 
-  // Guardar reporte IA
-  const handleSaveReport = async (reportText: string) => {
-    if (!user?.id) {
-      toast.error('Usuario no autenticado');
-      return;
-    }
-    // Buscar el id del escaneo más reciente (Nmap, Fuzzing, Whois)
-    let scanId = dbScanId; // Usa el id real de la base de datos
-    if (!scanId) {
-      toast.error('No se encontró el escaneo para asociar el reporte');
-      return;
-    }
-    try {
-      const res = await fetch('http://localhost:3001/api/save-report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          scanId: scanId,
-          reportText: reportText
-        })
-      });
-      const data = await res.json();
-      if (data.success) {
-        toast.success('Reporte guardado exitosamente');
-      } else {
-        toast.error(data.message || 'Error al guardar el reporte');
-      }
-    } catch (error) {
-      toast.error('Error de conexión al guardar el reporte');
-    }
+  // Función para abrir la IA sin resetear la conversación
+  const handleOpenAI = () => {
+    setAiMinimized(false);
+    setAiCollapsed(false);
+    // NO resetear la conversación aquí
   };
 
   // Simular datos de estadísticas
@@ -637,6 +721,19 @@ const Scanner = () => {
                           <p className="text-gray-500">El escaneo no detectó información relevante para este objetivo.</p>
                         </div>
                       )}
+                      
+                      {/* Mostrar mensaje de error si el escaneo falló */}
+                      {currentScan.status === 'failed' && (
+                        <div className="text-center py-12">
+                          <div className="w-16 h-16 bg-red-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+                            <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                            </svg>
+                          </div>
+                          <h3 className="text-lg font-semibold text-red-900 mb-2">Error en el escaneo</h3>
+                          <p className="text-red-600">El escaneo no pudo completarse. Por favor, intenta nuevamente.</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                   {/* Cara trasera: estadísticas */}
@@ -687,93 +784,168 @@ const Scanner = () => {
           </div>
         )}
       </div>
-      {/* Botón flotante para volver arriba */}
-      {showScrollTop && (
-        <button
-          onClick={() => topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-          className="fixed bottom-8 right-8 z-50 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-full shadow-lg p-4 hover:scale-110 transition-transform flex items-center space-x-2"
-          aria-label="Volver arriba"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-          </svg>
-          <span className="hidden sm:inline font-semibold">Ir arriba</span>
-        </button>
-      )}
-      
-      {/* Botón flotante para guardar escaneo */}
-      {currentScan && currentScan.status === 'completed' && !scanSaved && (
-        <button
-          onClick={handleSaveScan}
-          disabled={saveScanClicked}
-          className="fixed bottom-8 left-8 z-50 bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-full shadow-lg p-4 hover:scale-110 transition-transform flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          aria-label="Guardar escaneo"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-          </svg>
-          <span className="hidden sm:inline font-semibold">Guardar</span>
-        </button>
-      )}
-      
-      {/* Botón flotante para generar reporte con IA */}
-      {currentScan && currentScan.status === 'completed' && scanSaved && (
-        <button
-          onClick={handleGenerateReport}
-          className="fixed bottom-20 left-8 z-50 bg-gradient-to-br from-purple-500 to-pink-600 text-white rounded-full shadow-lg p-4 hover:scale-110 transition-transform flex items-center space-x-2"
-          aria-label="Generar reporte con IA"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-          </svg>
-          <span className="hidden sm:inline font-semibold">IA Reporte</span>
-        </button>
-      )}
-      
-      {/* Botón flotante para ir abajo */}
-      {showScrollBottom && (
-        <button
-          onClick={() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-          className="fixed bottom-20 right-8 z-50 bg-gradient-to-br from-cyan-500 to-teal-600 text-white rounded-full shadow-lg p-4 hover:scale-110 transition-transform flex items-center space-x-2"
-          aria-label="Ir abajo"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-          </svg>
-          <span className="hidden sm:inline font-semibold">Ir abajo</span>
-        </button>
-      )}
-      {/* Chatbot Modal flotante */}
-      <ChatbotModal
-        open={chatbotOpen}
-        onClose={() => setChatbotOpen(false)}
-        messages={chatbotMessages}
-        loading={chatbotLoading}
-        onSaveReport={handleSaveReport}
-      >
-        <div className="flex gap-2 mt-4">
-          <input
-            type="text"
-            value={chatInput}
-            onChange={e => setChatInput(e.target.value)}
-            className="flex-1 border rounded-lg px-3 py-2"
-            placeholder="Escribe tu mensaje..."
-            onKeyDown={e => { if (e.key === 'Enter') handleChatbotSend(); }}
-            disabled={chatbotLoading}
-          />
-          <button
-            onClick={handleChatbotSend}
-            className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
-            disabled={chatbotLoading || !chatInput.trim()}
-          >
-            Enviar
-          </button>
+
+      {/* Panel de IA integrado */}
+      {!aiMinimized && (
+        <div className="w-[30%] min-w-[400px] bg-white shadow-2xl flex flex-col border-l border-gray-200 h-[calc(100vh-4rem)]"> {/* Ajustar altura */}
+          {/* Header de IA */}
+          <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+            <div className="flex items-center gap-3">
+              <img src="/Logo.svg" alt="Blitz Scan Logo" className="w-8 h-8 rounded-lg shadow" />
+              <div>
+                <h2 className="text-lg font-bold">BlitzScan IA</h2>
+                <p className="text-xs opacity-90">Asistente de Ciberseguridad</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setAiCollapsed(!aiCollapsed)}
+                className="text-white hover:text-gray-200 text-lg"
+                aria-label={aiCollapsed ? "Expandir IA" : "Colapsar IA"}
+              >
+                {aiCollapsed ? '⬆️' : '⬇️'}
+              </button>
+              <button
+                onClick={handleCloseAI}
+                className="text-white hover:text-gray-200 text-xl font-bold"
+                aria-label="Minimizar IA"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+
+          {/* Contenido de IA */}
+          {!aiCollapsed && (
+            <>
+              {/* Mensajes */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {chatbotMessages.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                        msg.sender === 'user'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-100 text-gray-900'
+                      }`}
+                    >
+                      {msg.sender === 'bot' ? (
+                        <ReactMarkdown 
+                          components={{
+                            p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
+                            strong: ({children}) => <strong className="font-bold text-gray-900">{children}</strong>,
+                            em: ({children}) => <em className="italic">{children}</em>,
+                            code: ({children}) => <code className="bg-gray-200 px-1 py-0.5 rounded text-sm">{children}</code>,
+                            pre: ({children}) => <pre className="bg-gray-200 p-2 rounded text-sm overflow-x-auto">{children}</pre>,
+                            ul: ({children}) => <ul className="list-disc list-inside space-y-1">{children}</ul>,
+                            ol: ({children}) => <ol className="list-decimal list-inside space-y-1">{children}</ol>,
+                            li: ({children}) => <li className="text-sm">{children}</li>
+                          }}
+                        >
+                          {msg.text}
+                        </ReactMarkdown>
+                      ) : (
+                        <span className="text-sm">{msg.text}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                
+                {chatbotLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-gray-100 rounded-2xl px-4 py-3">
+                      <div className="flex items-center gap-2 text-gray-500">
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span className="text-sm">Pensando...</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sugerencias después de generar un reporte */}
+                {isReportGenerated && chatbotMessages.filter(m => m.sender === 'bot').slice(-1)[0]?.text && !chatbotLoading && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-500 text-center">💡 Sugerencias:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {getContextualSuggestions(currentQueryType).map((suggestion, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setChatInput(suggestion);
+                            setTimeout(() => handleChatbotSend(), 100);
+                          }}
+                          className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-200 transition-colors"
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Botones de acción */}
+              {chatbotMessages.filter(m => m.sender === 'bot').slice(-1)[0]?.text && !chatbotLoading && isReportGenerated && !scanSaved && (
+                <div className="p-4 border-t border-gray-200 bg-gray-50">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        const lastBotMsg = chatbotMessages.filter(m => m.sender === 'bot').slice(-1)[0]?.text;
+                        if (lastBotMsg) {
+                          navigator.clipboard.writeText(lastBotMsg);
+                        }
+                      }}
+                      className="flex-1 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+                    >
+                      📋 Copiar
+                    </button>
+                    <button
+                      onClick={() => {
+                        const lastBotMsg = chatbotMessages.filter(m => m.sender === 'bot').slice(-1)[0]?.text;
+                        if (lastBotMsg && handleSaveReport) {
+                          handleSaveReport(lastBotMsg);
+                        }
+                      }}
+                      className="flex-1 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
+                    >
+                      💾 Guardar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Input de chat */}
+              <div className="p-4 border-t border-gray-200">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                    className="flex-1 border rounded-lg px-3 py-2"
+                    placeholder="Escribe tu mensaje..."
+                    onKeyDown={e => { if (e.key === 'Enter') handleChatbotSend(); }}
+                    disabled={chatbotLoading}
+                  />
+                  <button
+                    onClick={handleChatbotSend}
+                    className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+                    disabled={chatbotLoading || !chatInput.trim()}
+                  >
+                    Enviar
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
-      </ChatbotModal>
+      )}
     </div>
   );
 };
 
 export default Scanner;
-
-
