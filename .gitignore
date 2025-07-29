@@ -23,7 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 
-# Environment variables and sensitive files
+# Environment variables and secrets
 .env
 .env.local
 .env.development.local
@@ -32,17 +32,7 @@ dist-ssr
 backend/.env
 *.key
 *.pem
-secrets.json
-config.json
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
+# API Keys and secrets
+**/api_keys.txt
+**/secrets.txt
