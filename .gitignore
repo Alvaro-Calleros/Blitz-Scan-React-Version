@@ -22,17 +22,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-# Environment variables and secrets
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-backend/.env
-*.key
-*.pem
-
-# API Keys and secrets
-**/api_keys.txt
-**/secrets.txt
