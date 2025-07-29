@@ -1,15 +1,11 @@
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from dotenv import load_dotenv
-
-load_dotenv()
 
 class SupabaseDB:
     def __init__(self):
-        self.connection_string = os.getenv('SUPABASE_DATABASE_URL')
-        if not self.connection_string:
-            raise ValueError("SUPABASE_DATABASE_URL no está configurada en las variables de entorno")
+        # Configuración directa de Supabase
+        self.connection_string = "postgresql://postgres:0unAzjWbhKiiKT2q@db.ylwstbsiwkxtdgpicdaa.supabase.co:5432/postgres"
     
     def get_connection(self):
         """Obtiene una conexión a la base de datos de Supabase"""
