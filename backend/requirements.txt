@@ -3,3 +3,5 @@ psycopg2-binary
 flask-cors
 werkzeug
 python-dotenv
+requests
+openai

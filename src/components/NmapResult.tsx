@@ -295,9 +295,19 @@ const NmapResult: React.FC<NmapResultProps> = ({ result }) => {
 
       {/* Análisis de seguridad */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="glass-card modern-shadow p-8 bg-gradient-to-br from-red-50 to-red-100 animate-fadeInUp">
-          <h5 className="text-xl font-bold text-red-900 mb-4 flex items-center">
-            <span className="mr-2">🔒</span>
+        <div className={`glass-card modern-shadow p-8 animate-fadeInUp ${
+          criticalPorts.length > 0 || highRiskPorts.length > 0 
+            ? 'bg-gradient-to-br from-red-50 to-red-100' 
+            : 'bg-gradient-to-br from-green-50 to-green-100'
+        }`}>
+          <h5 className={`text-xl font-bold mb-4 flex items-center ${
+            criticalPorts.length > 0 || highRiskPorts.length > 0 
+              ? 'text-red-900' 
+              : 'text-green-900'
+          }`}>
+            <span className="mr-2">
+              {criticalPorts.length > 0 || highRiskPorts.length > 0 ? '🔒' : '✅'}
+            </span>
             Análisis de Seguridad
           </h5>
           <div className="space-y-3">
@@ -314,6 +324,14 @@ const NmapResult: React.FC<NmapResultProps> = ({ result }) => {
                 <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
                 <span className="text-yellow-800 font-medium">
                   {highRiskPorts.length} puertos de alto riesgo
+                </span>
+              </div>
+            )}
+            {criticalPorts.length === 0 && highRiskPorts.length === 0 && (
+              <div className="flex items-center space-x-3">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <span className="text-green-800 font-medium">
+                  No se detectaron problemas de seguridad
                 </span>
               </div>
             )}

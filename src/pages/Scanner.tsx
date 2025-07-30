@@ -7,6 +7,7 @@ import Navbar from '../components/Navbar';
 import WhoisResult from '../components/WhoisResult';
 import NmapResult from '../components/NmapResult';
 import FuzzingResult from '../components/FuzzingResult';
+import WhatWebResult from '../components/WhatWebResult';
 
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../components/ui/table';
 import { ChartContainer } from '../components/ui/chart';
@@ -681,52 +682,7 @@ const Scanner = () => {
                             </div>
                           )}
                           {scanType === 'whatweb' && currentScan.extraResult && (
-                            typeof currentScan.extraResult === 'string' ? (
-                              <div className="glass-card modern-shadow p-8 bg-gradient-to-br from-green-200 via-blue-100 to-blue-200 animate-fadeInUp rounded-3xl">
-                                <div className="flex items-center space-x-4 mb-6">
-                                  <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-blue-400 rounded-3xl flex items-center justify-center shadow-xl">
-                                    <span className="text-white text-4xl">🕵️‍♂️</span>
-                                  </div>
-                                  <div>
-                                    <h3 className="text-3xl font-bold bg-gradient-to-r from-green-700 to-blue-700 bg-clip-text text-transparent">WhatWeb Resultados</h3>
-                                    <p className="text-blue-900 text-base mt-1">Fingerprinting de tecnologías web</p>
-                                  </div>
-                                </div>
-                                <pre className="bg-gradient-to-br from-green-100 to-blue-100 rounded-xl p-4 text-blue-900 whitespace-pre-wrap text-sm shadow-inner font-mono">{currentScan.extraResult}</pre>
-                              </div>
-                            ) : (
-                              <div className="glass-card modern-shadow p-8 bg-gradient-to-br from-green-200 via-blue-100 to-blue-200 animate-fadeInUp rounded-3xl">
-                                <div className="flex items-center space-x-4 mb-6">
-                                  <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-blue-400 rounded-3xl flex items-center justify-center shadow-xl">
-                                    <span className="text-white text-4xl">🕵️‍♂️</span>
-                                  </div>
-                                  <div>
-                                    <h3 className="text-3xl font-bold bg-gradient-to-r from-green-700 to-blue-700 bg-clip-text text-transparent">WhatWeb Resultados</h3>
-                                    <p className="text-blue-900 text-base mt-1">Fingerprinting de tecnologías web</p>
-                                  </div>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                  {Object.entries(currentScan.extraResult).map(([cat, techs]) => (
-                                    Array.isArray(techs) && techs.length > 0 && (
-                                      <div key={cat} className="bg-gradient-to-br from-white to-blue-50 rounded-2xl shadow p-4">
-                                        <div className="flex items-center mb-2">
-                                          <span className="text-2xl mr-2">{getWhatwebCategoryIcon(cat)}</span>
-                                          <span className="font-bold text-lg text-blue-800">{cat}</span>
-                                        </div>
-                                        <ul className="space-y-1">
-                                          {techs.map((t, idx) => (
-                                            <li key={idx} className="flex items-center space-x-2">
-                                              <span className="font-semibold text-gray-900">{t.name}</span>
-                                              {t.version && <span className="text-xs text-gray-500">v{t.version}</span>}
-                                            </li>
-                                          ))}
-                                        </ul>
-                                      </div>
-                                    )
-                                  ))}
-                                </div>
-                              </div>
-                            )
+                            <WhatWebResult result={currentScan.extraResult} />
                           )}
                           {scanType === 'paramspider' && currentScan.extraResult && (
                             <div className="glass-card modern-shadow p-8 bg-gradient-to-br from-violet-100 via-violet-200 to-fuchsia-100 animate-fadeInUp rounded-3xl">
@@ -1092,15 +1048,4 @@ const Scanner = () => {
 
 export default Scanner;
 
-function getWhatwebCategoryIcon(cat: string): string {
-  switch (cat) {
-    case 'CMS': return '📰';
-    case 'Web Server': return '🌐';
-    case 'Programming Language': return '💻';
-    case 'JS Framework': return '⚛️';
-    case 'Analytics': return '📊';
-    case 'Operating System': return '🖥️';
-    case 'CDN': return '🚀';
-    default: return '🔧';
-  }
-}
+
