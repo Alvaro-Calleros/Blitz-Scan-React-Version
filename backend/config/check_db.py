@@ -1,4 +1,4 @@
-from supabase_config import db
+from backend.config.supabase_config import db
 import json
 
 def check_scans():

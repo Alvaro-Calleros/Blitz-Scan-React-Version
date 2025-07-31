@@ -6,7 +6,7 @@ from datetime import datetime
 # Agregar el directorio padre al path para importar módulos del backend
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from supabase_config import db
+from backend.config.supabase_config import db
 
 def test_db_connection():
     """Verifica la conexión con Supabase"""

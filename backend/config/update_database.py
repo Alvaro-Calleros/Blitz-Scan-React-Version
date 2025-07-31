@@ -5,7 +5,7 @@ Script para actualizar la base de datos con las nuevas tablas de escaneos
 
 import os
 import sys
-from supabase_config import db
+from backend.config.supabase_config import db
 
 def read_sql_file(filename):
     """Lee el archivo SQL y retorna su contenido"""

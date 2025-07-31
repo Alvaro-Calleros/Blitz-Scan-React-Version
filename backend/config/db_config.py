@@ -1,6 +1,6 @@
 # backend/db_config.py
 # Este archivo se mantiene por compatibilidad, pero ahora usa Supabase
-from supabase_config import db
+from backend.config.supabase_config import db
 
 def init_mysql(app):
     """

@@ -9,7 +9,7 @@ def check_and_fix_database():
     print("=" * 50)
     
     try:
-        from supabase_config import db
+        from backend.config.supabase_config import db
         
         # 1. Verificar si existe la columna eliminado en escaneos
         print("1️⃣ Verificando columna 'eliminado' en tabla escaneos...")

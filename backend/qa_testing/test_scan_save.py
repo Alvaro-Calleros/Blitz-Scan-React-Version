@@ -132,7 +132,7 @@ def test_database_connection():
     print("🗄️ Verificando conexión a la base de datos...")
     
     try:
-        from supabase_config import db
+        from backend.config.supabase_config import db
         
         # Verificar que la tabla escaneos existe
         result = db.execute_one("""

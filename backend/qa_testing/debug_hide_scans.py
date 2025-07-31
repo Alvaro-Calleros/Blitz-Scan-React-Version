@@ -26,7 +26,7 @@ def debug_hide_scans():
     # 2. Verificar estructura de la base de datos
     print("\n2️⃣ Verificando estructura de BD...")
     try:
-        from supabase_config import db
+        from backend.config.supabase_config import db
         
         # Verificar si existe la columna eliminado
         result = db.execute_one("""

@@ -4,12 +4,12 @@ import hashlib
 import os
 import json
 from werkzeug.utils import secure_filename
-from supabase_config import db
+from backend.config.supabase_config import db
 import traceback
 import requests
 import openai
 
-OPENAI_API_KEY = "..." #TODO: Cambiar por la API key de OpenAI
+OPENAI_API_KEY = "" # Aqui va Tu API Key de OpenAI
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": "http://localhost:8080"}})

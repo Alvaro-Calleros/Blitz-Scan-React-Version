@@ -5,7 +5,7 @@ Ejecuta este script solo una vez para migrar datos existentes
 """
 
 import hashlib
-from supabase_config import db
+from backend.config.supabase_config import db
 import json
 
 def migrate_users():

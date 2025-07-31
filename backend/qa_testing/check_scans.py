@@ -3,7 +3,7 @@
 Script para verificar escaneos en la base de datos
 """
 
-from supabase_config import db
+from backend.config.supabase_config import db
 
 def check_scans():
     """Verifica los escaneos existentes en la base de datos"""

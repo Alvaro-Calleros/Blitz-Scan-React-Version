@@ -124,7 +124,7 @@ def test_hide_scans():
             # 5. Verificar en base de datos
             print("\n5️⃣ Verificando en base de datos...")
             try:
-                from supabase_config import db
+                from backend.config.supabase_config import db
                 
                 # Contar escaneos activos
                 active_scans = db.execute_one("SELECT COUNT(*) as count FROM escaneos WHERE id_usuario = 1 AND eliminado = FALSE")

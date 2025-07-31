@@ -100,7 +100,7 @@ def test_complete_integration():
     # 4. Verificar en base de datos
     print("\n4️⃣ Verificando en base de datos...")
     try:
-        from supabase_config import db
+        from backend.config.supabase_config import db
         
         # Contar escaneos
         result = db.execute_one("SELECT COUNT(*) as count FROM escaneos")

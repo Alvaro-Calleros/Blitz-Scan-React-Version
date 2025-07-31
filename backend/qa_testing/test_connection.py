@@ -82,7 +82,7 @@ def test_api_functions():
     print("\n🧪 Probando funciones de la API...")
     
     try:
-        from supabase_config import db
+        from backend.config.supabase_config import db
         
         # Probar consulta simple
         result = db.execute_one("SELECT COUNT(*) as count FROM usuarios")

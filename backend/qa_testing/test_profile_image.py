@@ -45,7 +45,7 @@ def test_profile_image_update():
             print("✅ Actualización de foto exitosa")
             
             # Verificar que se guardó en la base de datos
-            from supabase_config import db
+            from backend.config.supabase_config import db
             user = db.execute_one('SELECT profile_image FROM usuarios WHERE id = %s', (test_user_id,))
             if user and user['profile_image']:
                 print(f"✅ Foto guardada en BD: {user['profile_image']}")
@@ -79,7 +79,7 @@ def test_database_column():
     print("🗄️ Verificando columna profile_image...")
     
     try:
-        from supabase_config import db
+        from backend.config.supabase_config import db
         
         # Verificar si la columna existe
         result = db.execute_one("""
