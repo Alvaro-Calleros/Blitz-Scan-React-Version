@@ -4,7 +4,7 @@ import hashlib
 import os
 import json
 from werkzeug.utils import secure_filename
-from backend.config.supabase_config import db
+from config.supabase_config import db
 import traceback
 import requests
 import openai
