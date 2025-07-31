@@ -123,17 +123,6 @@ def embellecer_subfinder(salida):
     salida_limpia += [f"✅ {d}" for d in dominios]
     return '\n'.join(salida_limpia)
 
-# 🎯 Embellecedor de resultados HTTPX
-# Eliminar escaneo httpx
-
-def embellecer_httpx(salida):
-    lines = [l.strip() for l in salida.splitlines() if l.strip()]
-    if not lines:
-        return '🔍 No se encontraron hosts vivos.'
-    salida_limpia = [f"🌐 Hosts vivos detectados: {len(lines)}"]
-    salida_limpia += [f"✅ {l}" for l in lines]
-    return '\n'.join(salida_limpia)
-
 # 🎯 Embellecedor de resultados NUCLEI
 
 def embellecer_nuclei(salida):
