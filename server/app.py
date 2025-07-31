@@ -66,13 +66,52 @@ def embellecer_dirsearch(salida):
 def embellecer_nmap(salida):
     lineas = salida.splitlines()
     utiles = [l for l in lineas if 'open' in l]
+    
     if not utiles:
-        return "🔍 No se encontraron puertos abiertos."
+        return {
+            "raw": salida,
+            "openPorts": [],
+            "message": "🔍 No se encontraron puertos abiertos."
+        }
 
+    # Procesar puertos abiertos
+    open_ports = []
+    for linea in utiles:
+        # Parsear línea como "80/tcp  open  http"
+        partes = linea.strip().split()
+        if len(partes) >= 3:
+            port_service = partes[0]  # "80/tcp"
+            status = partes[1]        # "open"
+            service = partes[2]       # "http"
+            
+            # Extraer puerto y protocolo
+            if '/' in port_service:
+                port, protocol = port_service.split('/')
+            else:
+                port = port_service
+                protocol = 'tcp'
+            
+            # Buscar versión si existe
+            version = None
+            if len(partes) > 3:
+                version = ' '.join(partes[3:])
+            
+            open_ports.append({
+                "port": f"{port}/{protocol}",
+                "service": service,
+                "version": version
+            })
+    
+    # Crear mensaje embellecido
     salida_limpia = ["📡 Puertos abiertos detectados:\n"]
     for l in utiles:
         salida_limpia.append(f"✅ {l.strip()}")
-    return '\n'.join(salida_limpia)
+    
+    return {
+        "raw": salida,
+        "openPorts": open_ports,
+        "message": '\n'.join(salida_limpia)
+    }
 
 # 🎯 Embellecedor de resultados SUBFINDER
 
@@ -144,13 +183,56 @@ def escanear_nmap():
         return jsonify({'resultado': '❌ No se recibió ningún objetivo.'}), 400
 
     try:
-        print(f"Ejecutando Nmap para: {objetivo}")  
-        resultado = subprocess.check_output([
-            r'C:\Program Files (x86)\Nmap\nmap.exe', '-F', objetivo
-        ], text=True)
-        salida = embellecer_nmap(resultado)
-    except subprocess.CalledProcessError as e:
-        salida = f"❌ Error al ejecutar Nmap:\n{e.output}"
+        print(f"Ejecutando Nmap para: {objetivo}")
+        
+        # Intentar diferentes rutas de Nmap
+        nmap_paths = [
+            r'C:\Program Files (x86)\Nmap\nmap.exe',
+            r'C:\Program Files\Nmap\nmap.exe',
+            'nmap',  # Si está en PATH
+            'nmap.exe'  # Si está en PATH
+        ]
+        
+        resultado = None
+        error_msg = ""
+        
+        for nmap_path in nmap_paths:
+            try:
+                print(f"Intentando con: {nmap_path}")
+                resultado = subprocess.check_output([
+                    nmap_path, '-F', objetivo
+                ], text=True, stderr=subprocess.PIPE, timeout=120)
+                print(f"Nmap ejecutado exitosamente con: {nmap_path}")
+                break
+            except subprocess.CalledProcessError as e:
+                error_msg = f"Error con {nmap_path}: {e.stderr if e.stderr else e.output}"
+                print(error_msg)
+                # Si el error es por permisos, intentar con argumentos diferentes
+                if "permission" in error_msg.lower() or "access" in error_msg.lower():
+                    try:
+                        print(f"Intentando con argumentos alternativos: {nmap_path}")
+                        resultado = subprocess.check_output([
+                            nmap_path, '-sS', '-T4', '-F', objetivo
+                        ], text=True, stderr=subprocess.PIPE, timeout=120)
+                        print(f"Nmap ejecutado exitosamente con argumentos alternativos")
+                        break
+                    except Exception as e2:
+                        print(f"Error con argumentos alternativos: {e2}")
+                        continue
+                continue
+            except FileNotFoundError:
+                print(f"Nmap no encontrado en: {nmap_path}")
+                continue
+            except subprocess.TimeoutExpired:
+                error_msg = f"Timeout con {nmap_path}"
+                print(error_msg)
+                continue
+        
+        if resultado:
+            salida = embellecer_nmap(resultado)
+        else:
+            salida = f"❌ Error al ejecutar Nmap:\n{error_msg}\n\n💡 Asegúrate de que Nmap esté instalado y accesible desde la línea de comandos."
+            
     except Exception as e:
         salida = f"❌ Error inesperado:\n{str(e)}"
 
