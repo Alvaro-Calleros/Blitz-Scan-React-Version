@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface NmapResultProps {
-  result: { raw: string; openPorts: Array<{ port: string; service: string; version?: string }> };
+  result: string | { raw: string; openPorts: Array<{ port: string; service: string; version?: string }> };
 }
 
 // Función para calcular el riesgo según el puerto/servicio
@@ -66,7 +66,35 @@ const getCategoryIcon = (category: string) => {
 };
 
 const NmapResult: React.FC<NmapResultProps> = ({ result }) => {
-  const openPorts = result.openPorts || [];
+  // Manejar tanto string como objeto
+  let openPorts: Array<{ port: string; service: string; version?: string }> = [];
+  let rawOutput = '';
+  
+  if (typeof result === 'string') {
+    // Formato antiguo - procesar el string para extraer puertos
+    const lines = result.split('\n');
+    const portLines = lines.filter(line => line.includes('✅') && line.includes('open'));
+    
+    for (const line of portLines) {
+      // Extraer información del formato "✅ 80/tcp  open  http"
+      const match = line.match(/✅\s+(\S+)\s+open\s+(\S+)/);
+      if (match) {
+        const port = match[1];
+        const service = match[2];
+        openPorts.push({
+          port: port,
+          service: service,
+          version: undefined
+        });
+      }
+    }
+    rawOutput = result;
+  } else {
+    // Formato nuevo - objeto estructurado
+    openPorts = result.openPorts || [];
+    rawOutput = result.raw || '';
+  }
+  
   const hasOpenPorts = openPorts.length > 0;
 
   // Análisis de datos
