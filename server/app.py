@@ -85,6 +85,7 @@ def embellecer_subfinder(salida):
     return '\n'.join(salida_limpia)
 
 # 🎯 Embellecedor de resultados HTTPX
+# Eliminar escaneo httpx
 
 def embellecer_httpx(salida):
     lines = [l.strip() for l in salida.splitlines() if l.strip()]
