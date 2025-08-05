@@ -42,6 +42,7 @@ const Scanner = () => {
   const [currentQueryType, setCurrentQueryType] = useState<AIQueryType>('general_chat'); // Tipo de consulta actual
   const [aiCollapsed, setAiCollapsed] = useState(false); // Para colapsar/expandir la IA
   const [aiMinimized, setAiMinimized] = useState(true); // Para minimizar/maximizar la IA
+  const [showActionButtons, setShowActionButtons] = useState(false); // Para controlar la visibilidad de los botones de acción
 
   // Nuevo: estado para categoría seleccionada
   const scanCategories = [
@@ -108,6 +109,8 @@ const Scanner = () => {
     setIsScanning(true);
     setScanSaved(false);
     setSaveScanClicked(false);
+    setShowActionButtons(false); // Resetear botones de acción
+    setIsReportGenerated(false); // Resetear estado de reporte generado
     const scanId = generateScanId();
     const newScan: ScanWithHarvester = {
       id: scanId,
@@ -333,6 +336,7 @@ const Scanner = () => {
     setChatbotMessages(prev => [...prev, { sender: 'user', text: 'Genera un reporte de seguridad para mi escaneo.' }]);
     setChatbotLoading(true);
     setIsReportGenerated(false); // Resetear al generar nuevo reporte
+    setShowActionButtons(false); // Ocultar botones de acción mientras se genera
     setCurrentQueryType('security_report'); // Marcar como reporte de seguridad
     try {
       let scanType = currentScan.scan_type;
@@ -375,6 +379,7 @@ const Scanner = () => {
           { sender: 'bot', text: reportData.report }
         ]);
         setIsReportGenerated(true); // Marcar que se generó un reporte
+        setShowActionButtons(true); // Mostrar botones de acción
       } else {
         setChatbotMessages(prev => [
           ...prev,
@@ -433,6 +438,7 @@ const Scanner = () => {
       if (data.report) {
         setChatbotMessages(prev => [...prev, { sender: 'bot', text: data.report }]);
         // No marcar como reporte generado para mensajes normales del chat
+        setShowActionButtons(false); // Ocultar botones de acción para chat normal
       } else {
         setChatbotMessages(prev => [...prev, { sender: 'bot', text: 'No se pudo generar respuesta.' }]);
       }
@@ -975,7 +981,7 @@ const Scanner = () => {
                 </div>
 
                 {/* Botones de acción */}
-                {chatbotMessages.filter(m => m.sender === 'bot').slice(-1)[0]?.text && !chatbotLoading && isReportGenerated && !scanSaved && (
+                {showActionButtons && !chatbotLoading && chatbotMessages.filter(m => m.sender === 'bot').slice(-1)[0]?.text && (
                   <div className="p-4 border-t border-gray-200 bg-gray-50">
                     <div className="flex gap-2">
                       <button
@@ -983,6 +989,7 @@ const Scanner = () => {
                           const lastBotMsg = chatbotMessages.filter(m => m.sender === 'bot').slice(-1)[0]?.text;
                           if (lastBotMsg) {
                             navigator.clipboard.writeText(lastBotMsg);
+                            toast.success('Reporte copiado al portapapeles');
                           }
                         }}
                         className="flex-1 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
