@@ -148,7 +148,7 @@ const ChatbotModal: React.FC<ChatbotModalProps> = ({
         </div>
 
         {/* Botones de acción */}
-        {lastBotMsg && !loading && isReportGenerated && !scanAlreadySaved && (
+        {lastBotMsg && !loading && isReportGenerated && (
           <div className="p-4 border-t border-gray-200 bg-gray-50">
             <div className="flex gap-2">
               <button
